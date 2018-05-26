@@ -1,0 +1,22 @@
+Alembicに関して、vcpkgで自動で入るが、OpenExrのヘッダーが見えていないので、追加しなければならない。
+$(VcpkgRoot)include\OpenExr;
+
+
+また、Alembic.dllなどが、デバッグとリリースで切り替えたとしても、ファイル名が同じ関係か、ビルド時にコピーが走らないようだ。
+したがって、ビルド前イベントで消してあげると、ビルドを切り替えたときに更新される。
+del $(TargetDir)Alembic.dll
+del $(TargetDir)Half.dll
+del $(TargetDir)Iex-2_2.dll
+del $(TargetDir)Imath-2_2.dll
+
+
+embreeはvcpkgのが古いようで、公式からとってくるため、dllも自動でコピーされるようにしたい。
+ただtbbも依存しているようだが、バージョンが任意らしいので、tbbはvcpkgのを使うことにした。
+以下のOFデフォルトのコピーに加え、
+
+for /d %%f in ("$(OF_ROOT)\libs\*") do (if exist "%%f\lib\vs\$(Platform_Actual)\*.dll" (robocopy "%%f\lib\vs\$(Platform_Actual)" "$(ProjectDir)bin" "*.dll" /njs /njh /np /fp /bytes ))
+if errorlevel 1 exit 0 else exit %errorlevel%
+
+以下も追加しておくとよい
+robocopy "C:\Program Files\Intel\Embree3 x64\bin" $(TargetDir) embree3.dll
+robocopy "$(VcpkgRoot)bin" $(TargetDir) tbb.dll
