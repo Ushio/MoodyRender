@@ -461,6 +461,8 @@ void ofApp::keyPressed(int key) {
 
 	if (key == 's') {
 		_image.save("pt.png");
+		ofFloatImage img(_image);
+		img.save("pt.exr");
 	}
 }
 

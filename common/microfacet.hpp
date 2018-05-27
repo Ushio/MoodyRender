@@ -33,6 +33,26 @@ namespace rt {
 		return numer / denom;
 	}
 
+	inline float G_v_cavity(glm::vec3 L, glm::vec3 V, glm::vec3 H, glm::vec3 N, float alpha) {
+		float a = 2.0f * glm::dot(N, H) * glm::dot(N, V) / glm::dot(V, H);
+		float b = 2.0f * glm::dot(N, H) * glm::dot(N, L) / glm::dot(L, H);
+		return glm::min(glm::min(a, b), 1.0f);
+	}
+
+	//inline double G_kalemen(Vec3 L, Vec3 V, Vec3 H, Vec3 N, double alpha) {
+	//	return 2.0 * glm::dot(N, L) * glm::dot(N, V) / (1.0 + glm::dot(L, V));
+	//}
+
+	inline float BeckmannMicrofacetBRDF_without_F(const glm::vec3 &omega_i, const glm::vec3 &omega_o, const glm::vec3 &omega_h, const glm::vec3 &Ng, float alpha) {
+		float d = D_Beckman(Ng, omega_h, alpha);
+		float g = G2_height_correlated_beckmann(omega_i, omega_o, omega_h, Ng, alpha);
+
+		float cos_term_wo = glm::dot(Ng, omega_o);
+		float cos_term_wi = glm::dot(Ng, omega_i);
+
+		return d * g / (4.0f * cos_term_wo * cos_term_wi);
+	}
+
 	inline float fresnel_v(float n, float k, float cosTheta) {
 		float n2_add_k2 = n * n + k * k;
 		float numer = n2_add_k2 - 2.0f * n * cosTheta + cosTheta * cosTheta;
