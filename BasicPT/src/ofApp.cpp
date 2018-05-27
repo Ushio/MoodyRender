@@ -8,9 +8,6 @@
 
 #include "ofApp.h"
 
-#include <strict_variant/variant.hpp>
-
-
 namespace rt {
 	inline void EmbreeErorrHandler(void* userPtr, RTCError code, const char* str) {
 		printf("Embree Error [%d] %s\n", code, str);
@@ -192,8 +189,6 @@ namespace rt {
 
 			if (scene.intersect(ro, rd, 0.00001f, &mat, &tmin)) {
 				if (auto material = strict_variant::get<LambertianMaterial>(&mat)) {
-					// LambertianMaterial material = mat.get<LambertianMaterial>();
-
 					glm::vec3 sample = sample_cosine_weighted_hemisphere_brdf(random);
 					float pdf_omega = cosine_weighted_hemisphere_pdf_brdf(sample);
 					glm::vec3 wi = from_bxdf(material->Ng, sample);

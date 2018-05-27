@@ -9,6 +9,18 @@
 #include <functional>
 
 namespace rt {
+	typedef strict_variant::variant<
+		glm::vec3,
+		float,
+		std::string
+	> AttributeVariant;
+	
+	struct AlembicGeometry {
+		std::vector<glm::vec3> points;
+		std::vector<glm::ivec3> primitives;
+		std::map<std::string, std::vector<AttributeVariant>> primitiveAttributes;
+	};
+
 	using namespace Alembic::Abc;
 	using namespace Alembic::AbcGeom;
 
@@ -38,6 +50,77 @@ namespace rt {
 				visitProperties(child_prop, scalarProp, arrayProp, compoundProp, name);
 			}
 		}
+	}
+
+	inline std::vector<AttributeVariant> readAttributes(IArrayProperty prop) {
+		auto dataType = prop.getDataType();
+		if (dataType.getExtent() == 3 && dataType.getPod() == kFloat32POD) {
+			Abc::IV3fArrayProperty arrayProp(prop.getParent(), prop.getName());
+			V3fArraySamplePtr sample;
+			arrayProp.get(sample);
+			std::vector<AttributeVariant> values(sample->size());
+			for (int j = 0; j < sample->size(); ++j) {
+				auto value = sample->get()[j];
+				values[j] = glm::vec3(value.x, value.y, value.z);
+			}
+			return values;
+		} else {
+			throw std::exception("unsupported dataType");
+		}
+	}
+	inline std::vector<AttributeVariant> readAttributes(ICompoundProperty prop) {
+		Abc::IUInt32ArrayProperty indicesProp(prop, ".indices");
+		Abc::IStringArrayProperty stringProp(prop, ".vals");
+
+		UInt32ArraySamplePtr indicesSample;
+		indicesProp.get(indicesSample);
+		std::vector<uint32_t> indices(indicesSample->get(), indicesSample->get() + indicesSample->size());
+
+		StringArraySamplePtr stringSample;
+		stringProp.get(stringSample);
+		std::vector<std::string> values(stringSample->get(), stringSample->get() + stringSample->size());
+
+		std::vector<AttributeVariant> expands(indices.size());
+		for (int i = 0; i < indices.size(); ++i) {
+			expands[i] = values[indices[i]];
+		}
+		return expands;
+	}
+
+	inline std::map<std::string, std::vector<AttributeVariant>> primitiveAttributes(ICompoundProperty props) {
+		std::map<std::string, std::vector<AttributeVariant>> attributes;
+		try {
+			ICompoundProperty geom(props, ".geom");
+			ICompoundProperty arbGeomParams(geom, ".arbGeomParams");
+			for (int i = 0; i < arbGeomParams.getNumProperties(); ++i) {
+				auto header = arbGeomParams.getPropertyHeader(i);
+				auto attributeHeader = arbGeomParams.getPropertyHeader(i);
+				auto propType = attributeHeader.getPropertyType();
+
+				try {
+					if (propType == AbcA::PropertyType::kScalarProperty) {
+						// invalid
+						continue;
+					}
+					else if (propType == AbcA::PropertyType::kArrayProperty) {
+						auto valueProp = IArrayProperty(arbGeomParams, attributeHeader.getName());
+						attributes[attributeHeader.getName()] = readAttributes(valueProp);
+					}
+					else if (propType == AbcA::PropertyType::kCompoundProperty) {
+						auto valueProp = ICompoundProperty(arbGeomParams, attributeHeader.getName());
+						attributes[attributeHeader.getName()] = readAttributes(valueProp);
+					}
+				}
+				catch (std::exception &e) {
+					printf("exception, %s\n", e.what());
+					continue;
+				}
+			}
+		}
+		catch (std::exception &e) {
+			printf("exception, %s\n", e.what());
+		}
+		return attributes;
 	}
 
 	inline void printProperties(ICompoundProperty props, std::string dir = "") {
@@ -204,14 +287,7 @@ namespace rt {
 		return matrix;
 	}
 
-	typedef strict_variant::variant<glm::vec3, float, std::string> AttributeVariant;
-	struct AlembicGeometry {
-		std::vector<glm::vec3> points;
-		std::vector<glm::ivec3> primitives;
-		std::map<std::string, std::vector<AttributeVariant>> primitiveAttributes;
-	};
-
-	inline void parseHierarchy(IObject o, Scene &scene) {
+	inline void parseHierarchy(IObject o, Scene &scene, std::function<Geometry (AlembicGeometry)> binding) {
 		auto header = o.getHeader();
 
 		if (IPolyMesh::matches(header)) {
@@ -219,8 +295,8 @@ namespace rt {
 			IPolyMeshSchema &mesh = polyMesh.getSchema();
 
 			auto transform = GetTransform(o);
-
-			Geometry geometry;
+			
+			AlembicGeometry geometry;
 
 			// Parse Point
 			Abc::IP3fArrayProperty P = mesh.getPositionsProperty();
@@ -232,7 +308,7 @@ namespace rt {
 				auto p = PSample->get()[i];
 				auto point = glm::vec3(p.x, p.y, p.z);
 				point = transform * glm::vec4(point, 1.0f);
-				geometry.points[i].P = glm::vec3(point.x, point.y, point.z);
+				geometry.points[i] = glm::vec3(point.x, point.y, point.z);
 			}
 
 			Abc::IInt32ArrayProperty FaceCounts = mesh.getFaceCountsProperty();
@@ -243,52 +319,32 @@ namespace rt {
 			Int32ArraySamplePtr IndicesSample;
 			Indices.get(IndicesSample);
 
-			// Parse Attributes
+			// Attributesをパース、3角形ポリゴンにする関係で、アトリビュートの配列も調整する
 			ICompoundProperty props = polyMesh.getProperties();
-
-			std::vector<string> materials;
-			std::vector<glm::vec3> Cd;
-			std::vector<glm::vec3> Le;
-			try {
-				// Material
-				materials = propertyMaterial(props);
-
-				// Diffuse
-				Cd = propertyArrayVec3(props, "/.geom/.arbGeomParams/Cd");
-				Le = propertyArrayVec3(props, "/.geom/.arbGeomParams/Le");
-			}
-			catch (...) {
-				printf("material property error\n");
-				materials.resize(FaceCountsSample->size(), LambertianMaterialString);
-				Cd.resize(FaceCountsSample->size(), glm::vec3(0.5f));
-				Le.resize(FaceCountsSample->size(), glm::vec3());
-			}
-
+			auto attributes = primitiveAttributes(props);
+			std::map<std::string, std::vector<AttributeVariant>> primAttributes;
 
 			const int32_t *indices = IndicesSample->get();
-
 			for (int i = 0; i < FaceCountsSample->size(); ++i) {
-				auto material = materials[i];
 				auto count = FaceCountsSample->get()[i];
 
 				for (int j = 2; j < count; ++j) {
-					Geometry::Primitive primitive;
-					primitive.indices[0] = indices[0];
-					//primitive.indices[1] = indices[j - 1];
-					//primitive.indices[2] = indices[j];
-					primitive.indices[1] = indices[j];
-					primitive.indices[2] = indices[j - 1];
-
-					if (material == LambertianMaterialString) {
-						LambertianMaterial m(Le[i], Cd[i]);
-						primitive.material = m;
-					}
+					glm::ivec3 primitive;
+					primitive[0] = indices[0];
+					primitive[1] = indices[j];
+					primitive[2] = indices[j - 1];
 					geometry.primitives.push_back(primitive);
+
+					for (auto it = attributes.begin(); it != attributes.end(); ++it) {
+						AttributeVariant attrib = it->second[i];
+						primAttributes[it->first].push_back(attrib);
+					}
 				}
 				indices += count;
 			}
+			geometry.primitiveAttributes = primAttributes;
 
-			scene.geometries.push_back(geometry);
+			scene.geometries.push_back(binding(geometry));
 		}
 
 		if (ICamera::matches(header)) {
@@ -369,7 +425,7 @@ namespace rt {
 
 		for (int i = 0; i < o.getNumChildren(); ++i) {
 			IObject child = o.getChild(i);
-			parseHierarchy(child, scene);
+			parseHierarchy(child, scene, binding);
 		}
 	}
 
@@ -378,6 +434,52 @@ namespace rt {
 		IObject top(archive, kTop);
 		rt::printHierarchy(top);
 
-		rt::parseHierarchy(top, scene);
+		rt::parseHierarchy(top, scene, [](AlembicGeometry abcGeom) {
+			Geometry geom;
+			for (int pointID = 0; pointID < abcGeom.points.size(); ++pointID) {
+				Geometry::Point point;
+				point.P = abcGeom.points[pointID];
+				geom.points.push_back(point);
+			}
+			for (int primID = 0; primID < abcGeom.primitives.size(); ++primID) {
+				Geometry::Primitive prim;
+				prim.indices = abcGeom.primitives[primID];
+				prim.material = LambertianMaterial();
+				geom.primitives.push_back(prim);
+			}
+
+			// Primitive Material
+			const char *LambertianMaterialString = "LambertianMaterial";
+			const char *SpecularMaterialString = "SpecularMaterial";
+
+			auto material = abcGeom.primitiveAttributes.find("Material");
+			if (material != abcGeom.primitiveAttributes.end()) {
+				std::vector<AttributeVariant> materials = material->second;
+				for (int primID = 0; primID < materials.size(); ++primID) {
+					if (auto materialString = strict_variant::get<std::string>(&materials[primID])) {
+						if (*materialString == LambertianMaterialString) {
+							LambertianMaterial m;
+							if (abcGeom.primitiveAttributes.count("Le")) {
+								auto Le = abcGeom.primitiveAttributes["Le"][primID];
+								if (auto LeVec3 = strict_variant::get<glm::vec3>(&Le)) {
+									m.Le = *LeVec3;
+								}
+							}
+							if (abcGeom.primitiveAttributes.count("Cd")) {
+								auto Cd = abcGeom.primitiveAttributes["Cd"][primID];
+								if (auto CdVec3 = strict_variant::get<glm::vec3>(&Cd)) {
+									m.R = *CdVec3;
+								}
+							}
+							geom.primitives[primID].material = m;
+						}
+						else if (*materialString == SpecularMaterialString) {
+							geom.primitives[primID].material = SpecularMaterial();
+						}
+					}
+				}
+			}
+			return geom;
+		});
 	}
 }

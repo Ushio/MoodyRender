@@ -12,7 +12,7 @@
 namespace rt {
 	class LambertianMaterial {
 	public:
-		LambertianMaterial() {}
+		LambertianMaterial():Le(0.0f), R(1.0f) {}
 		LambertianMaterial(glm::vec3 e, glm::vec3 r) : Le(e), R(r) {}
 		glm::vec3 Le;
 		glm::vec3 R;
@@ -22,13 +22,10 @@ namespace rt {
 			return glm::any(glm::greaterThanEqual(Le, glm::vec3(glm::epsilon<float>())));
 		}
 	};
-	static const char *LambertianMaterialString = "LambertianMaterial";
-
 	class SpecularMaterial {
 	public:
 		glm::vec3 Ng;
 	};
-	static const char *SpecularMaterialString = "SpecularMaterial";
 
 	typedef strict_variant::variant<LambertianMaterial, SpecularMaterial> Material;
 
