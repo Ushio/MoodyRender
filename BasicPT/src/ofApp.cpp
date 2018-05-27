@@ -1,5 +1,6 @@
 ﻿#include "alembic_loader.hpp"
 #include "render_object.hpp"
+#include "microfacet.hpp"
 
 #include <xmmintrin.h>
 #include <pmmintrin.h>
@@ -199,6 +200,56 @@ namespace rt {
 					Lo += material->Le * T;
 
 					T *= brdf * cos_term / pdf_omega;
+
+					ro = (ro + rd * tmin);
+					rd = wi;
+				}
+				else if (auto material = strict_variant::get<MicrofacetConductorMaterial>(&mat)) {
+					glm::vec3 wo = -rd;
+					float alpha = 0.2f;
+
+					/*
+					 コサイン重点サンプリング
+					*/
+					//glm::vec3 sample = sample_cosine_weighted_hemisphere_brdf(random);
+					//float pdf_omega = cosine_weighted_hemisphere_pdf_brdf(sample);
+					//glm::vec3 wi = from_bxdf(material->Ng, sample);
+
+					/*
+					 ハーフベクトルの重点サンプリング
+					*/
+					float theta = std::atan(std::sqrt(-alpha * alpha * std::log(1.0f - random->uniform())));
+					float phi = random->uniform(0.0f, glm::two_pi<double>());
+					glm::vec3 sample = polar_to_cartesian(theta, phi);
+					glm::vec3 harf = from_bxdf(material->Ng, sample);
+					glm::vec3 wi = glm::reflect(-wo, harf);
+					float pdf_omega = D_Beckman(material->Ng, harf, alpha) * glm::dot(material->Ng, harf) / (4.0f * glm::dot(wi, harf));
+					if (glm::dot(material->Ng, wi) <= 0.0f) {
+						T = glm::vec3(0.0);
+						break;
+					}
+
+					glm::vec3 h = glm::normalize(wi + wo);
+					float d = D_Beckman(material->Ng, h, alpha);
+					float g = G2_height_correlated_beckmann(wi, wo, h, material->Ng, alpha);
+
+					float cos_term_wo = glm::dot(material->Ng, wo);
+					float cos_term_wi = glm::dot(material->Ng, wi);
+
+					float brdf_without_f = d * g / (4.0f * cos_term_wo * cos_term_wi);
+
+					glm::vec3 eta(0.15557f, 0.42415f, 1.3821f);
+					glm::vec3 k(3.6024f, 2.4721f, 1.9155f);
+
+					float cosThetaFresnel = glm::dot(h, wo);
+					glm::vec3 f = glm::vec3(
+						fresnel_unpolarized(eta.r, k.r, cosThetaFresnel),
+						fresnel_unpolarized(eta.g, k.g, cosThetaFresnel),
+						fresnel_unpolarized(eta.b, k.b, cosThetaFresnel)
+					);
+
+					glm::vec3 brdf = f * brdf_without_f * cos_term_wi;
+					T *= brdf * cos_term_wi / pdf_omega;
 
 					ro = (ro + rd * tmin);
 					rd = wi;

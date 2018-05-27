@@ -451,6 +451,7 @@ namespace rt {
 			// Primitive Material
 			const char *LambertianMaterialString = "LambertianMaterial";
 			const char *SpecularMaterialString = "SpecularMaterial";
+			const char *MicrofacetConductorMaterialString = "MicrofacetConductorMaterial";
 
 			auto material = abcGeom.primitiveAttributes.find("Material");
 			if (material != abcGeom.primitiveAttributes.end()) {
@@ -472,6 +473,9 @@ namespace rt {
 								}
 							}
 							geom.primitives[primID].material = m;
+						}
+						else if (*materialString == MicrofacetConductorMaterialString) {
+							geom.primitives[primID].material = MicrofacetConductorMaterial();
 						}
 						else if (*materialString == SpecularMaterialString) {
 							geom.primitives[primID].material = SpecularMaterial();

@@ -10,24 +10,32 @@
 #include "camera.hpp"
 
 namespace rt {
-	class LambertianMaterial {
+	class MaterialBase {
+	public:
+		glm::vec3 Ng;
+	};
+	class LambertianMaterial : public MaterialBase {
 	public:
 		LambertianMaterial():Le(0.0f), R(1.0f) {}
 		LambertianMaterial(glm::vec3 e, glm::vec3 r) : Le(e), R(r) {}
 		glm::vec3 Le;
 		glm::vec3 R;
-		glm::vec3 Ng;
 
 		bool isEmissive() const {
 			return glm::any(glm::greaterThanEqual(Le, glm::vec3(glm::epsilon<float>())));
 		}
 	};
-	class SpecularMaterial {
+	class SpecularMaterial : public MaterialBase {
 	public:
-		glm::vec3 Ng;
+
 	};
 
-	typedef strict_variant::variant<LambertianMaterial, SpecularMaterial> Material;
+	class MicrofacetConductorMaterial : public MaterialBase {
+	public:
+
+	};
+
+	typedef strict_variant::variant<LambertianMaterial, SpecularMaterial, MicrofacetConductorMaterial> Material;
 
 	namespace MaterialVisitor {
 		struct SetNg {
