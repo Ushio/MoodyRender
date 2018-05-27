@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <Alembic/Abc/All.h>
 #include <Alembic/AbcCoreOgawa/All.h>
@@ -319,7 +319,7 @@ namespace rt {
 			Int32ArraySamplePtr IndicesSample;
 			Indices.get(IndicesSample);
 
-			// Attributes‚ğƒp[ƒXA3ŠpŒ`ƒ|ƒŠƒSƒ“‚É‚·‚éŠÖŒW‚ÅAƒAƒgƒŠƒrƒ…[ƒg‚Ì”z—ñ‚à’²®‚·‚é
+			// Attributesã‚’ãƒ‘ãƒ¼ã‚¹ã€3è§’å½¢ãƒãƒªã‚´ãƒ³ã«ã™ã‚‹é–¢ä¿‚ã§ã€ã‚¢ãƒˆãƒªãƒ“ãƒ¥ãƒ¼ãƒˆã®é…åˆ—ã‚‚èª¿æ•´ã™ã‚‹
 			ICompoundProperty props = polyMesh.getProperties();
 			auto attributes = primitiveAttributes(props);
 			std::map<std::string, std::vector<AttributeVariant>> primAttributes;
@@ -349,15 +349,15 @@ namespace rt {
 
 		if (ICamera::matches(header)) {
 			/*
-			‚Æ‚è‚ ‚¦‚¸
-			@@Transform
+			ã¨ã‚Šã‚ãˆãš
+			ã€€ã€€Transform
 				View/Resolution
-				View/Focal Length, Aperture (fovy ‚ğŒvZ)
+				View/Focal Length, Aperture (fovy ã‚’è¨ˆç®—)
 				    
 				Bokeh
 					Focus Distance
 					F-Stop
-			‚Ì‚İ‘Î‰
+			ã®ã¿å¯¾å¿œ
 			*/
 
 			ICamera cameraObj(o);

@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
@@ -32,7 +32,7 @@ namespace rt {
 		float lensRadius = 0.1f;
 		float focasDistance = 3.0f;
 
-		// TODO ®—
+		// TODO æ•´ç†
 		float tanThetaH() const {
 			return std::tan(fovy * 0.5f);
 		}
@@ -44,7 +44,7 @@ namespace rt {
 		}
 
 		float widthV() const {
-			// ‘Š—ŠÖŒW‚æ‚è
+			// ç›¸ä¼¼é–¢ä¿‚ã‚ˆã‚Š
 			return imageWidth * focasDistance / distanceS();
 		}
 		float heightV() const {
@@ -108,7 +108,7 @@ namespace rt {
 			return _setting;
 		}
 
-		// ‚¿‚å‚Á‚Æ‰º‚Æˆ—‚ªd•¡
+		// ã¡ã‚‡ã£ã¨ä¸‹ã¨å‡¦ç†ãŒé‡è¤‡
 		glm::vec3 sampleLens(PeseudoRandom *random) const {
 			glm::vec2 sample = uniform_in_unit_circle(random);
 			float r = setting().lensRadius;
@@ -149,7 +149,7 @@ namespace rt {
 		}
 
 		bool findPixel(const glm::vec3 &o, const glm::vec3 &d, int *x, int *y) const {
-			// ‹tŒü‚«‚ÌŒõü‚Í–³‹
+			// é€†å‘ãã®å…‰ç·šã¯ç„¡è¦–
 			if (0.0f < glm::dot(d, front())) {
 				return false;
 			}

@@ -1,4 +1,4 @@
-#include "alembic_loader.hpp"
+ï»¿#include "alembic_loader.hpp"
 #include "render_object.hpp"
 
 #include <xmmintrin.h>
@@ -24,7 +24,7 @@ namespace rt {
 			for (int i = 0; i < _scene->geometries.size(); ++i) {
 				RTCGeometry embreeGeometry = rtcNewGeometry(_embreeDevice, RTC_GEOMETRY_TYPE_TRIANGLE);
 
-				// ƒoƒbƒtƒ@[‚ÍGeometry‚ÉŒ‹‚Ñ‚Â‚«AŠ—L‚³‚ê‚é
+				// ãƒãƒƒãƒ•ã‚¡ãƒ¼ã¯Geometryã«çµã³ã¤ãã€æ‰€æœ‰ã•ã‚Œã‚‹
 				float *pVertexBuffer = (float *)rtcSetNewGeometryBuffer(embreeGeometry, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(float) * 3, _scene->geometries[i].points.size());
 				for (int j = 0; j < _scene->geometries[i].points.size(); ++j) {
 					auto p = _scene->geometries[i].points[j].P;
@@ -145,12 +145,12 @@ namespace rt {
 		std::vector<Pixel> _pixels;
 	};
 
-	// ˆê”Ê“I‹ÉÀ•WŒn‚Åz‚ª–@ü
+	// ä¸€èˆ¬çš„æ¥µåº§æ¨™ç³»ã§zãŒæ³•ç·š
 	inline float cosine_weighted_hemisphere_pdf_brdf(glm::vec3 dir) {
 		return dir.z * glm::one_over_pi<float>();
 	}
 
-	// ˆê”Ê“I‹ÉÀ•WŒn‚Åz‚ª–@ü
+	// ä¸€èˆ¬çš„æ¥µåº§æ¨™ç³»ã§zãŒæ³•ç·š
 	inline glm::vec3 sample_cosine_weighted_hemisphere_brdf(PeseudoRandom *random) {
 		float u1 = random->uniformf();
 		float u2 = random->uniformf();
@@ -159,7 +159,7 @@ namespace rt {
 		glm::vec3 sample(r * glm::cos(phi), r * glm::sin(phi), glm::sqrt(1.0f - u1));
 		return sample;
 	}
-	// z‚ªã‚ÌÀ•WŒn‚ÉˆÚ“®‚·‚és—ñ
+	// zãŒä¸Šã®åº§æ¨™ç³»ã«ç§»å‹•ã™ã‚‹è¡Œåˆ—
 	inline glm::mat3 to_bxdf_basis_transform(const glm::vec3 &n) {
 		glm::vec3 xaxis;
 		glm::vec3 zaxis = n;

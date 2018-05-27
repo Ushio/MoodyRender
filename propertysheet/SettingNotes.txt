@@ -20,3 +20,8 @@ if errorlevel 1 exit 0 else exit %errorlevel%
 以下も追加しておくとよい
 robocopy "C:\Program Files\Intel\Embree3 x64\bin" $(TargetDir) embree3.dll
 robocopy "$(VcpkgRoot)bin" $(TargetDir) tbb.dll
+
+文字コード
+/utf-8 は、ソースおよび実行文字セットを UTF-8 に設定します
+http://pronama.azurewebsites.net/2017/04/14/visual-studio-2017-shift_jis-to-utf8/
+などで文字コードを固定するのがベターと思われる
