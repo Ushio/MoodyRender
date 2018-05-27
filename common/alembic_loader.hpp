@@ -6,6 +6,8 @@
 
 #include "render_object.hpp"
 
+#include <functional>
+
 namespace rt {
 	using namespace Alembic::Abc;
 	using namespace Alembic::AbcGeom;
@@ -202,7 +204,7 @@ namespace rt {
 		return matrix;
 	}
 
-	typedef mapbox::util::variant<glm::vec3, float, std::string> AttributeVariant;
+	typedef strict_variant::variant<glm::vec3, float, std::string> AttributeVariant;
 	struct AlembicGeometry {
 		std::vector<glm::vec3> points;
 		std::vector<glm::ivec3> primitives;

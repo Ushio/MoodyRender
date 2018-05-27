@@ -5,7 +5,7 @@
   <PropertyGroup />
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>$(VcpkgRoot)include\OpenExr;$(ProjectDir)/../common;$(ProjectDir)/src;C:\Program Files\Intel\Embree3 x64\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(VcpkgRoot)include\OpenExr;$(ProjectDir)/../common;$(ProjectDir)/src;C:\Program Files\Intel\Embree3 x64\include;$(ProjectDir)/../libs/strict-variant/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>C:\Program Files\Intel\Embree3 x64\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>

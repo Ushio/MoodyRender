@@ -4,7 +4,8 @@
 
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
-#include <mapbox/variant.hpp>
+// #include <mapbox/variant.hpp>
+#include <strict_variant/variant.hpp>
 
 #include "camera.hpp"
 
@@ -29,7 +30,24 @@ namespace rt {
 	};
 	static const char *SpecularMaterialString = "SpecularMaterial";
 
-	typedef mapbox::util::variant<LambertianMaterial, SpecularMaterial> Material;
+	typedef strict_variant::variant<LambertianMaterial, SpecularMaterial> Material;
+
+	namespace MaterialVisitor {
+		struct SetNg {
+			SetNg(const glm::vec3 &Ng) : _Ng(Ng) {}
+			template <class T>
+			void operator()(T &m) {
+				m.Ng = _Ng;
+			}
+			glm::vec3 _Ng;
+		};
+		struct GetNg {
+			template <class T>
+			glm::vec3 operator()(T &m) {
+				return m.Ng;
+			}
+		};
+	}
 
 	class Geometry {
 	public:

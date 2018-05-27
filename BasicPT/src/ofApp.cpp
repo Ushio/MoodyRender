@@ -3,10 +3,13 @@
 
 #include <xmmintrin.h>
 #include <pmmintrin.h>
-
-#include "ofApp.h"
 #include <tbb/tbb.h>
 #include <embree3/rtcore.h>
+
+#include "ofApp.h"
+
+#include <strict_variant/variant.hpp>
+
 
 namespace rt {
 	inline void EmbreeErorrHandler(void* userPtr, RTCError code, const char* str) {
@@ -88,15 +91,7 @@ namespace rt {
 			*material = prim.material;
 			glm::vec3 NgUnnormalized(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z);
 
-			if (material->is<LambertianMaterial>()) {
-				material->get<LambertianMaterial>().Ng = glm::normalize(NgUnnormalized);
-			}
-			else if (material->is<SpecularMaterial>()) {
-				material->get<SpecularMaterial>().Ng = glm::normalize(NgUnnormalized);
-			}
-			else {
-				abort();
-			}
+			strict_variant::apply_visitor(MaterialVisitor::SetNg(glm::normalize(NgUnnormalized)), *material);
 
 			return true;
 		}
@@ -196,27 +191,28 @@ namespace rt {
 			float tmin = std::numeric_limits<float>::max();
 
 			if (scene.intersect(ro, rd, 0.00001f, &mat, &tmin)) {
-				if (mat.is<LambertianMaterial>()) {
-					LambertianMaterial material = mat.get<LambertianMaterial>();
+				if (auto material = strict_variant::get<LambertianMaterial>(&mat)) {
+					// LambertianMaterial material = mat.get<LambertianMaterial>();
 
 					glm::vec3 sample = sample_cosine_weighted_hemisphere_brdf(random);
 					float pdf_omega = cosine_weighted_hemisphere_pdf_brdf(sample);
-					glm::vec3 wi = from_bxdf(material.Ng, sample);
+					glm::vec3 wi = from_bxdf(material->Ng, sample);
 
-					glm::vec3 brdf = material.R * glm::vec3(glm::one_over_pi<float>());
+					glm::vec3 brdf = material->R * glm::vec3(glm::one_over_pi<float>());
 					float cos_term = abs_cos_theta_bxdf(sample);
 
-					Lo += material.Le * T;
+					Lo += material->Le * T;
 
 					T *= brdf * cos_term / pdf_omega;
 
 					ro = (ro + rd * tmin);
 					rd = wi;
 				}
-				//else if (mat.is<SpecularMaterial>()) {
-				//	glm::vec3 wi = glm::reflect(ray.d, intersection.normal);
-				//	ray = Ray(ray.o + ray.d * tmin + wi * 0.000001, wi);
-				//}
+				else if (auto material = strict_variant::get<SpecularMaterial>(&mat)) {
+					glm::vec3 wi = glm::reflect(rd, material->Ng);
+					ro = (ro + rd * tmin);
+					rd = wi;
+				}
 			}
 			else {
 				break;
@@ -345,7 +341,6 @@ void ofApp::draw() {
 		}
 		mesh.drawWireframe();
 	}
-
 	{
 		auto camera = scene->camera;
 		ofSetColor(255);
@@ -375,8 +370,8 @@ void ofApp::draw() {
 			ofSetColor(255, 0, 0);
 			auto p = o + d * tmin;
 			ofDrawLine(o.x, o.y, o.z, p.x, p.y, p.z);
-
-			auto pn = p + m.get<rt::LambertianMaterial>().Ng * 0.1f;
+			
+			auto pn = p + strict_variant::apply_visitor(rt::MaterialVisitor::GetNg(), m) * 0.1f;
 			ofDrawLine(p.x, p.y, p.z, pn.x, pn.y, pn.z);
 		} else {
 			ofSetColor(255);
