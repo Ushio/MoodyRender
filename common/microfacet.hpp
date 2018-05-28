@@ -71,6 +71,23 @@ namespace rt {
 		return (fresnel_v(n, k, cosTheta) + fresnel_h(n, k, cosTheta)) * 0.5f;
 	}
 
+	inline float fresnel_dielectrics(float cosTheta) {
+		auto sqr = [](float x) { return x * x; };
+
+		float eta_t = 1.5f; // for grass
+		float eta_i = 1.0f;
+		float c = cosTheta;
+		float g = std::sqrt(eta_t * eta_t / sqr(eta_i) - 1.0f + sqr(c));
+
+		float a = 0.5f * sqr(g - c) / sqr(g + c);
+		float b = 1.0f + sqr(c * (g + c) - 1.0f) / sqr(c * (g - c) + 1.0f);
+		return a * b;
+	}
+
+	float fresnel_shlick(float f0, float cosTheta) {
+		return f0 + (1.0f - f0) * std::pow(1.0f - cosTheta, 5);
+	}
+
 	inline glm::vec3 polar_to_cartesian(float theta, float phi) {
 		float sinTheta = sin(theta);
 		glm::vec3 v = {

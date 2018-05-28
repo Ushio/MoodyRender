@@ -1,6 +1,7 @@
 ﻿#include "alembic_loader.hpp"
 #include "render_object.hpp"
 #include "microfacet.hpp"
+#include "bicubic.hpp"
 
 #include <xmmintrin.h>
 #include <pmmintrin.h>
@@ -10,6 +11,36 @@
 #include "ofApp.h"
 
 namespace rt {
+	class SpecularAlbedo {
+	public:
+		void load(std::string path) {
+			_specular_albedo.load(path);
+		}
+		float sample(float o_theta, float alpha) {
+			float u = ofMap(alpha, 0.0001f, 1.0f, 0.0f, 1.0f);
+			float v = ofMap(o_theta, 0.0001f, glm::radians(90.0f), 0.0f, 1.0f);
+			float *p = _specular_albedo.getPixels().getPixels();
+			float value = bicubic_2d(u, v, _specular_albedo.getWidth(), _specular_albedo.getHeight(), [&](int x, int y) { return p[y * (int)_specular_albedo.getWidth() + x]; });
+			return value;
+		}
+		ofFloatImage _specular_albedo;
+	};
+	class SpecularAlbedoAvg {
+	public:
+		void load(std::string path) {
+			_specular_albedo_avg.load(path);
+		}
+		float sample(float alpha) {
+			float u = ofMap(alpha, 0.0001f, 1.0f, 0.0f, 1.0f);
+			float *p = _specular_albedo_avg.getPixels().getPixels();
+			float value = bicubic_1d(u, _specular_albedo_avg.getWidth(), [&](int x) { return p[x]; });
+			return value;
+		}
+		ofFloatImage _specular_albedo_avg;
+	};
+	SpecularAlbedo specularAlbedo;
+	SpecularAlbedoAvg specularAlbedoAvg;
+
 	inline void EmbreeErorrHandler(void* userPtr, RTCError code, const char* str) {
 		printf("Embree Error [%d] %s\n", code, str);
 	}
@@ -206,28 +237,28 @@ namespace rt {
 				}
 				else if (auto material = strict_variant::get<MicrofacetConductorMaterial>(&mat)) {
 					glm::vec3 wo = -rd;
-					float alpha = 0.2f;
+					float alpha = 0.05f;
 
 					/*
 					 コサイン重点サンプリング
 					*/
-					//glm::vec3 sample = sample_cosine_weighted_hemisphere_brdf(random);
-					//float pdf_omega = cosine_weighted_hemisphere_pdf_brdf(sample);
-					//glm::vec3 wi = from_bxdf(material->Ng, sample);
+					glm::vec3 sample = sample_cosine_weighted_hemisphere_brdf(random);
+					float pdf_omega = cosine_weighted_hemisphere_pdf_brdf(sample);
+					glm::vec3 wi = from_bxdf(material->Ng, sample);
 
 					/*
 					 ハーフベクトルの重点サンプリング
 					*/
-					float theta = std::atan(std::sqrt(-alpha * alpha * std::log(1.0f - random->uniform())));
-					float phi = random->uniform(0.0f, glm::two_pi<double>());
-					glm::vec3 sample = polar_to_cartesian(theta, phi);
-					glm::vec3 harf = from_bxdf(material->Ng, sample);
-					glm::vec3 wi = glm::reflect(-wo, harf);
-					float pdf_omega = D_Beckman(material->Ng, harf, alpha) * glm::dot(material->Ng, harf) / (4.0f * glm::dot(wi, harf));
-					if (glm::dot(material->Ng, wi) <= 0.0f) {
-						T = glm::vec3(0.0);
-						break;
-					}
+					//float theta = std::atan(std::sqrt(-alpha * alpha * std::log(1.0f - random->uniform())));
+					//float phi = random->uniform(0.0f, glm::two_pi<double>());
+					//glm::vec3 sample = polar_to_cartesian(theta, phi);
+					//glm::vec3 harf = from_bxdf(material->Ng, sample);
+					//glm::vec3 wi = glm::reflect(-wo, harf);
+					//float pdf_omega = D_Beckman(material->Ng, harf, alpha) * glm::dot(material->Ng, harf) / (4.0f * glm::dot(wi, harf));
+					//if (glm::dot(material->Ng, wi) <= 0.0f) {
+					//	T = glm::vec3(0.0);
+					//	break;
+					//}
 
 					glm::vec3 h = glm::normalize(wi + wo);
 					float d = D_Beckman(material->Ng, h, alpha);
@@ -242,13 +273,26 @@ namespace rt {
 					glm::vec3 k(3.6024f, 2.4721f, 1.9155f);
 
 					float cosThetaFresnel = glm::dot(h, wo);
-					glm::vec3 f = glm::vec3(
-						fresnel_unpolarized(eta.r, k.r, cosThetaFresnel),
-						fresnel_unpolarized(eta.g, k.g, cosThetaFresnel),
-						fresnel_unpolarized(eta.b, k.b, cosThetaFresnel)
-					);
+					//glm::vec3 f = glm::vec3(
+					//	fresnel_unpolarized(eta.r, k.r, cosThetaFresnel),
+					//	fresnel_unpolarized(eta.g, k.g, cosThetaFresnel),
+					//	fresnel_unpolarized(eta.b, k.b, cosThetaFresnel)
+					//);
+					glm::vec3 f = glm::vec3(fresnel_dielectrics(cosThetaFresnel));
+					// glm::vec3 f = glm::vec3(fresnel_shlick(0.04f, cosThetaFresnel));
 
-					glm::vec3 brdf = f * brdf_without_f * cos_term_wi;
+					glm::vec3 brdf_spec = f * brdf_without_f * cos_term_wi;
+
+					glm::vec3 kLambda(1.0f, 0.447067, 0.246);
+					// glm::vec3 kLambda(0.5);
+					glm::vec3 brdf_diff = kLambda
+						* (1.0f - specularAlbedo.sample(glm::acos(cos_term_wo), alpha))
+						* (1.0f - specularAlbedo.sample(glm::acos(cos_term_wi), alpha))
+						/ (glm::pi<float>() * (1.0f - specularAlbedoAvg.sample(alpha)));
+
+					glm::vec3 brdf = brdf_spec + brdf_diff;
+					// glm::vec3 brdf = brdf_spec;
+
 					T *= brdf * cos_term_wi / pdf_omega;
 
 					ro = (ro + rd * tmin);
@@ -285,7 +329,11 @@ namespace rt {
 						glm::vec3 o;
 						glm::vec3 d;
 						_scene->camera.sampleRay(random, x, y, &o, &d);
-						_image.add(x, y, radiance(*_sceneInterface, o, d, random));
+
+						auto r = radiance(*_sceneInterface, o, d, random);
+						if(glm::all(glm::isfinite(r))) {
+							_image.add(x, y, r);
+						}
 					}
 				}
 			});
@@ -343,6 +391,9 @@ void ofApp::setup(){
 	scene = std::shared_ptr<rt::Scene>(new rt::Scene());
 	rt::loadFromABC(ofToDataPath("cornelbox.abc").c_str(), *scene);
 	renderer = std::shared_ptr<rt::PTRenderer>(new rt::PTRenderer(scene));
+
+	rt::specularAlbedo.load("specular_albedo.exr");
+	rt::specularAlbedoAvg.load("albedo_avg.exr");
 }
 
 //--------------------------------------------------------------
@@ -462,7 +513,6 @@ void ofApp::keyPressed(int key) {
 	if (key == 's') {
 		_image.save("pt.png");
 		ofFloatImage img(_image);
-		img.save("pt.exr");
 	}
 }
 
