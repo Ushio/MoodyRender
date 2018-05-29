@@ -191,23 +191,7 @@ namespace rt {
 		glm::vec3 sample(r * glm::cos(phi), r * glm::sin(phi), glm::sqrt(1.0f - u1));
 		return sample;
 	}
-	// zが上の座標系に移動する行列
-	inline glm::mat3 to_bxdf_basis_transform(const glm::vec3 &n) {
-		glm::vec3 xaxis;
-		glm::vec3 zaxis = n;
-		glm::vec3 yaxis;
-		if (0.999f < glm::abs(zaxis.z)) {
-			xaxis = glm::normalize(glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), zaxis));
-		}
-		else {
-			xaxis = glm::normalize(glm::cross(glm::vec3(0.0f, 0.0f, 1.0f), zaxis));
-		}
-		yaxis = glm::cross(zaxis, xaxis);
-		return glm::transpose(glm::mat3(xaxis, yaxis, zaxis));
-	}
-	inline glm::vec3 from_bxdf(const glm::vec3 &n, const glm::vec3 &bxdf_dir) {
-		return glm::transpose(to_bxdf_basis_transform(n)) * bxdf_dir;
-	}
+
 	inline float abs_cos_theta_bxdf(glm::vec3 dir) {
 		return glm::abs(dir.z);
 	}
@@ -242,9 +226,9 @@ namespace rt {
 					/*
 					 コサイン重点サンプリング
 					*/
-					glm::vec3 sample = sample_cosine_weighted_hemisphere_brdf(random);
-					float pdf_omega = cosine_weighted_hemisphere_pdf_brdf(sample);
-					glm::vec3 wi = from_bxdf(material->Ng, sample);
+					//glm::vec3 sample = sample_cosine_weighted_hemisphere_brdf(random);
+					//float pdf_omega = cosine_weighted_hemisphere_pdf_brdf(sample);
+					//glm::vec3 wi = from_bxdf(material->Ng, sample);
 
 					/*
 					 ハーフベクトルの重点サンプリング
@@ -259,6 +243,27 @@ namespace rt {
 					//	T = glm::vec3(0.0);
 					//	break;
 					//}
+
+					// 
+					//glm::vec3 wi = NDFImportanceSampler::sample_wi_Beckmann(random, alpha, wo, material->Ng);
+					//float pdf_omega = NDFImportanceSampler::pdfBeckmann(wi, alpha, wo, material->Ng);
+
+					// ミックス 重点サンプリング
+					glm::vec3 wi;
+					float spAlbedo = specularAlbedo.sample(std::acos(glm::dot(material->Ng, wo)), alpha);
+
+					if (random->uniformf() < spAlbedo) {
+						wi = NDFImportanceSampler::sample_wi_Beckmann(random, alpha, wo, material->Ng);
+					}
+					else {
+						glm::vec3 sample = sample_cosine_weighted_hemisphere_brdf(random);
+						wi = from_bxdf(material->Ng, sample);
+					}
+
+					float pdf_omega = 
+						spAlbedo * NDFImportanceSampler::pdfBeckmann(wi, alpha, wo, material->Ng) 
+						+
+						(1.0f - spAlbedo) * cosine_weighted_hemisphere_pdf_brdf(to_bxdf_basis_transform(material->Ng) * wi);
 
 					glm::vec3 h = glm::normalize(wi + wo);
 					float d = D_Beckman(material->Ng, h, alpha);
@@ -331,7 +336,8 @@ namespace rt {
 						_scene->camera.sampleRay(random, x, y, &o, &d);
 
 						auto r = radiance(*_sceneInterface, o, d, random);
-						if(glm::all(glm::isfinite(r))) {
+
+						if(glm::all(glm::isfinite(r)) && glm::all(glm::lessThan(r, glm::vec3(100.0f)))) {
 							_image.add(x, y, r);
 						}
 					}
