@@ -2,43 +2,14 @@
 
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
+#include "coordinate.hpp"
 
 namespace rt {
-	// この辺も整理したい
-	inline glm::vec3 polar_to_cartesian(float theta, float phi) {
-		float sinTheta = sin(theta);
-		glm::vec3 v = {
-			sinTheta * cos(phi),
-			sinTheta * sin(phi),
-			cos(theta)
-		};
-		return v;
-	};
-	// zが上の座標系に移動する行列
-	inline glm::mat3 to_bxdf_basis_transform(const glm::vec3 &n) {
-		glm::vec3 xaxis;
-		glm::vec3 zaxis = n;
-		glm::vec3 yaxis;
-		if (0.999f < glm::abs(zaxis.z)) {
-			xaxis = glm::normalize(glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), zaxis));
-		}
-		else {
-			xaxis = glm::normalize(glm::cross(glm::vec3(0.0f, 0.0f, 1.0f), zaxis));
-		}
-		yaxis = glm::cross(zaxis, xaxis);
-		return glm::transpose(glm::mat3(xaxis, yaxis, zaxis));
-	}
-	inline glm::vec3 from_bxdf(const glm::vec3 &n, const glm::vec3 &bxdf_dir) {
-		return glm::transpose(to_bxdf_basis_transform(n)) * bxdf_dir;
-	}
-
-
-
 	inline float chi_plus(float x) {
 		return x < 0.0f ? 0.0f : 1.0f;
 	}
 
-	inline float D_Beckman(const glm::vec3 &n, const glm::vec3 &h, float alpha) {
+	inline float D_Beckmann(const glm::vec3 &n, const glm::vec3 &h, float alpha) {
 		float cosTheta = glm::dot(n, h);
 		if (cosTheta < 1.0e-5) {
 			return 0.0f;
@@ -63,7 +34,7 @@ namespace rt {
 		return numer / denom;
 	}
 
-	inline float G_v_cavity(glm::vec3 L, glm::vec3 V, glm::vec3 H, glm::vec3 N, float alpha) {
+	inline float G2_v_cavity(glm::vec3 L, glm::vec3 V, glm::vec3 H, glm::vec3 N) {
 		float a = 2.0f * glm::dot(N, H) * glm::dot(N, V) / glm::dot(V, H);
 		float b = 2.0f * glm::dot(N, H) * glm::dot(N, L) / glm::dot(L, H);
 		return glm::min(glm::min(a, b), 1.0f);
@@ -74,7 +45,7 @@ namespace rt {
 	//}
 
 	inline float BeckmannMicrofacetBRDF_without_F(const glm::vec3 &omega_i, const glm::vec3 &omega_o, const glm::vec3 &omega_h, const glm::vec3 &Ng, float alpha) {
-		float d = D_Beckman(Ng, omega_h, alpha);
+		float d = D_Beckmann(Ng, omega_h, alpha);
 		float g = G2_height_correlated_beckmann(omega_i, omega_o, omega_h, Ng, alpha);
 
 		float cos_term_wo = glm::dot(Ng, omega_o);
@@ -88,6 +59,7 @@ namespace rt {
 			float theta = std::atan(std::sqrt(-alpha * alpha * std::log(1.0f - random->uniform())));
 			float phi = random->uniform(0.0f, glm::two_pi<double>());
 			glm::vec3 sample = polar_to_cartesian(theta, phi);
+
 			glm::vec3 harf = from_bxdf(Ng, sample);
 			glm::vec3 wi = glm::reflect(-wo, harf);
 			return wi;
@@ -97,7 +69,7 @@ namespace rt {
 				return std::numeric_limits<float>::max();
 			}
 			glm::vec3 half = glm::normalize(sampled_wi + wo);
-			return D_Beckman(Ng, half, alpha) * glm::dot(Ng, half) / (4.0f * glm::dot(sampled_wi, half));
+			return D_Beckmann(Ng, half, alpha) * glm::dot(Ng, half) / (4.0f * glm::dot(sampled_wi, half));
 		}
 	};
 
@@ -119,10 +91,11 @@ namespace rt {
 		return (fresnel_v(n, k, cosTheta) + fresnel_h(n, k, cosTheta)) * 0.5f;
 	}
 
+	// Air to Glass
 	inline float fresnel_dielectrics(float cosTheta) {
 		auto sqr = [](float x) { return x * x; };
 
-		float eta_t = 1.5f; // for grass
+		float eta_t = 1.5f; // for Glass
 		float eta_i = 1.0f;
 		float c = cosTheta;
 		float g = std::sqrt(eta_t * eta_t / sqr(eta_i) - 1.0f + sqr(c));

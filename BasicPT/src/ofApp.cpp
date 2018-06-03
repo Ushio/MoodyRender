@@ -177,24 +177,48 @@ namespace rt {
 		std::vector<Pixel> _pixels;
 	};
 
-	// 一般的極座標系でzが法線
-	inline float cosine_weighted_hemisphere_pdf_brdf(glm::vec3 dir) {
-		return dir.z * glm::one_over_pi<float>();
-	}
+	// z が上, 任意の x, y
+	// 一般的な極座標系とも捉えられる
+	struct ArbitraryBRDFSpace {
+		ArbitraryBRDFSpace(const glm::vec3 &zAxis) {
+			zaxis = zAxis;
+			if (0.999f < glm::abs(zaxis.z)) {
+				xaxis = glm::normalize(glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), zaxis));
+			}
+			else {
+				xaxis = glm::normalize(glm::cross(glm::vec3(0.0f, 0.0f, 1.0f), zaxis));
+			}
+			yaxis = glm::cross(zaxis, xaxis);
+		}
+		glm::vec3 localToGlobal(const glm::vec3 v) const  {
+			return v.x * xaxis + v.y * yaxis + v.z * zaxis;
+		}
 
-	// 一般的極座標系でzが法線
-	inline glm::vec3 sample_cosine_weighted_hemisphere_brdf(PeseudoRandom *random) {
-		float u1 = random->uniformf();
-		float u2 = random->uniformf();
-		float r = glm::sqrt(u1);
-		float phi = glm::two_pi<float>() * u2;
-		glm::vec3 sample(r * glm::cos(phi), r * glm::sin(phi), glm::sqrt(1.0f - u1));
-		return sample;
-	}
+		// axis on global space
+		glm::vec3 xaxis;
+		glm::vec3 yaxis;
+		glm::vec3 zaxis;
+	};
 
-	inline float abs_cos_theta_bxdf(glm::vec3 dir) {
-		return glm::abs(dir.z);
-	}
+	class LambertianSampler {
+	public:
+		static glm::vec3 sample(PeseudoRandom *random, const glm::vec3 &Ng) {
+			float u1 = random->uniformf();
+			float u2 = random->uniformf();
+			float r = glm::sqrt(u1);
+			float phi = glm::two_pi<float>() * u2;
+			glm::vec3 sample(r * glm::cos(phi), r * glm::sin(phi), glm::sqrt(1.0f - u1));
+			ArbitraryBRDFSpace space(Ng);
+			return space.localToGlobal(sample);
+		}
+		static float pdf(const glm::vec3 &v, const glm::vec3 &Ng) {
+			float cosTheta = glm::dot(v, Ng);
+			if (cosTheta < 0.0f) {
+				return 0.0f;
+			}
+			return cosTheta * glm::one_over_pi<float>();
+		}
+	};
 
 	inline glm::vec3 radiance(const rt::SceneInterface &scene, glm::vec3 ro, glm::vec3 rd, PeseudoRandom *random) {
 		glm::vec3 Lo;
@@ -205,16 +229,19 @@ namespace rt {
 
 			if (scene.intersect(ro, rd, 0.00001f, &mat, &tmin)) {
 				if (auto material = strict_variant::get<LambertianMaterial>(&mat)) {
-					glm::vec3 sample = sample_cosine_weighted_hemisphere_brdf(random);
-					float pdf_omega = cosine_weighted_hemisphere_pdf_brdf(sample);
-					glm::vec3 wi = from_bxdf(material->Ng, sample);
+					glm::vec3 wi = LambertianSampler::sample(random, material->Ng);
+					float cos_term = glm::dot(wi, material->Ng);
+
+					//glm::vec3 sample = sample_cosine_weighted_hemisphere_brdf(random);
+					//float pdf_omega = cosine_weighted_hemisphere_pdf_brdf(sample);
+					//glm::vec3 wi = from_bxdf(material->Ng, sample);
 
 					glm::vec3 brdf = material->R * glm::vec3(glm::one_over_pi<float>());
-					float cos_term = abs_cos_theta_bxdf(sample);
+					//float cos_term = abs_cos_theta_bxdf(sample);
 
 					Lo += material->Le * T;
 
-					T *= brdf * cos_term / pdf_omega;
+					T *= brdf * cos_term / LambertianSampler::pdf(wi, material->Ng);
 
 					ro = (ro + rd * tmin);
 					rd = wi;
@@ -238,7 +265,7 @@ namespace rt {
 					//glm::vec3 sample = polar_to_cartesian(theta, phi);
 					//glm::vec3 harf = from_bxdf(material->Ng, sample);
 					//glm::vec3 wi = glm::reflect(-wo, harf);
-					//float pdf_omega = D_Beckman(material->Ng, harf, alpha) * glm::dot(material->Ng, harf) / (4.0f * glm::dot(wi, harf));
+					//float pdf_omega = D_Beckmann(material->Ng, harf, alpha) * glm::dot(material->Ng, harf) / (4.0f * glm::dot(wi, harf));
 					//if (glm::dot(material->Ng, wi) <= 0.0f) {
 					//	T = glm::vec3(0.0);
 					//	break;
@@ -256,17 +283,16 @@ namespace rt {
 						wi = NDFImportanceSampler::sample_wi_Beckmann(random, alpha, wo, material->Ng);
 					}
 					else {
-						glm::vec3 sample = sample_cosine_weighted_hemisphere_brdf(random);
-						wi = from_bxdf(material->Ng, sample);
+						wi = LambertianSampler::sample(random, material->Ng);
 					}
 
 					float pdf_omega = 
 						spAlbedo * NDFImportanceSampler::pdfBeckmann(wi, alpha, wo, material->Ng) 
 						+
-						(1.0f - spAlbedo) * cosine_weighted_hemisphere_pdf_brdf(to_bxdf_basis_transform(material->Ng) * wi);
+						(1.0f - spAlbedo) * LambertianSampler::pdf(wi, material->Ng);
 
 					glm::vec3 h = glm::normalize(wi + wo);
-					float d = D_Beckman(material->Ng, h, alpha);
+					float d = D_Beckmann(material->Ng, h, alpha);
 					float g = G2_height_correlated_beckmann(wi, wo, h, material->Ng, alpha);
 
 					float cos_term_wo = glm::dot(material->Ng, wo);

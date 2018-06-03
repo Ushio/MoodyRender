@@ -9,6 +9,9 @@
 #include "peseudo_random.hpp"
 #include "composite_simpson.hpp"
 #include "adaptive_simpson.hpp"
+#include "simpson_helper.hpp"
+#include "coordinate.hpp"
+#include "microfacet.hpp"
 
 TEST_CASE("online", "[online]") {
 	SECTION("online") {
@@ -36,7 +39,7 @@ TEST_CASE("simpson", "[simpson]") {
 	// example is from:
 	//     http://mathfaculty.fullerton.edu/mathews/n2003/AdaptiveQuadMod.html
 
-	SECTION("bad sample adaptive_simpson") {
+	SECTION("duplicated sample detection adaptive_simpson") {
 		auto f = [](double x) {
 			return (14.0 * x - 11.0 * x * x) * std::exp(-2.0 * x);
 		};
@@ -105,15 +108,64 @@ TEST_CASE("simpson", "[simpson]") {
 		}
 	}
 }
+TEST_CASE("microfacet", "[microfacet]") {
+	SECTION("hemisphere_adaptive_simpson") {
+		double result = rt::hemisphere_adaptive_simpson<double>([](double theta, double phi) {
+			return 1.0 / glm::pi<double>() * std::cos(theta);
+		}, 1.0e-12);
+		REQUIRE(std::abs(result - 1.0) < 1.0e-9);
+	}
+	SECTION("beckmann normalization") {
+		rt::Xor random;
+		for (int j = 0; j < 100; ++j) {
+			int sample = 0;
+
+			// alphaが小さい場合、simpsonによる積分が適さない
+			float alpha = random.uniformf(0.1f, 1.0f);
+			double result = rt::hemisphere_adaptive_simpson<double>([&](double theta, double phi) {
+				sample++;
+
+				glm::vec3 Ng(0.0f, 0.0f, 1.0f);
+				glm::vec3 sample_m = rt::polar_to_cartesian((float)theta, (float)phi);
+				float cosTheta = glm::dot(Ng, sample_m);
+				float value = rt::D_Beckmann(Ng, sample_m, alpha) * cosTheta;
+				return value;
+			}, 1.0e-12);
+			CAPTURE(alpha);
+			CAPTURE(sample);
+			REQUIRE(std::abs(result - 1.0) < 1.0e-6);
+		}
+	}
+
+
+	//rt::Xor random;
+	//for (int j = 0; j < 10; ++j) {
+	//	double alpha = random.uniform(0.1, 1.0);
+	//	rt::adaptive_simpson()
+	//	double value = integrate_composite_simpson<100>([&](double phi) {
+	//		return integrate_composite_simpson<100>([&](double theta) {
+	//			double jacobian = std::sin(theta);
+	//			Vec3 sample_m = toVector(theta, phi);
+	//			double cosTheta = sample_m.z;
+	//			double value = D_Beckman(m, sample_m, alpha) * glm::dot(m, sample_m);
+	//			// double value = D_GGX(m, sample_m, alpha) * glm::dot(m, sample_m);
+	//			return value * jacobian;
+	//		}, 0.0, glm::pi<double>() * 0.5);
+	//	}, 0.0, 2.0 * glm::pi<double>());
+	//	printf("  alpha %.4f\n", alpha);
+	//	printf("result: %.4f\n", value);
+	//}
+}
+
 
 
 int main(int argc, char* const argv[])
 {
-#if 0
+#if 1
 	// テストを指定する場合
 	char* custom_argv[] = {
 		"",
-		"[factorial]"
+		"[microfacet]"
 	};
 	Catch::Session().run(sizeof(custom_argv) / sizeof(custom_argv[0]), custom_argv);
 #else
