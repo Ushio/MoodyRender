@@ -28,7 +28,7 @@ namespace rt {
 		float a = 1.0f / (alpha * tanThetaO);
 		return (std::erf(a) - 1.0f) * 0.5f + std::exp(-a * a) / (2.0f * a * std::sqrt(glm::pi<float>()));
 	}
-	inline float G2_height_correlated_beckmann(const glm::vec3 &omega_i, const glm::vec3 &omega_o, const glm::vec3 &omega_h, const glm::vec3 &n, double alpha) {
+	inline float G2_height_correlated_beckmann(const glm::vec3 &omega_i, const glm::vec3 &omega_o, const glm::vec3 &omega_h, const glm::vec3 &n, float alpha) {
 		float numer = chi_plus(glm::dot(omega_o, omega_h)) * chi_plus(glm::dot(omega_i, omega_h));
 		float denom = (1.0f + lambda_beckmann(glm::dot(omega_o, n), alpha) + lambda_beckmann(glm::dot(omega_i, n), alpha));
 		return numer / denom;

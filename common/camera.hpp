@@ -12,8 +12,8 @@ namespace rt {
 		glm::vec2 d;
 		float sq = 0.0f;
 		do {
-			d.x = random->uniform(-1.0f, 1.0f);
-			d.y = random->uniform(-1.0f, 1.0f);
+			d.x = random->uniformf(-1.0f, 1.0f);
+			d.y = random->uniformf(-1.0f, 1.0f);
 			sq = glm::length2(d);
 		} while (1.0f < sq);
 		return d;

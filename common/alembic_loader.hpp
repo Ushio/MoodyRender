@@ -369,15 +369,15 @@ namespace rt {
 				schema.get(sample);
 
 				CameraSetting setting;
-				setting.imageWidth = propertyScalarFloat(props, "/.geom/.userProperties/resx");
-				setting.imageHeight = propertyScalarFloat(props, "/.geom/.userProperties/resy");
+				setting.imageWidth = (int)propertyScalarFloat(props, "/.geom/.userProperties/resx");
+				setting.imageHeight = (int)propertyScalarFloat(props, "/.geom/.userProperties/resy");
 
 				// http://127.0.0.1:48626/nodes/obj/cam#aperture
 				double aperture = sample.getVerticalAperture() /*centimeters*/ / 100.0;
 				double focalLength = sample.getFocalLength() /*millimeters*/ / 1000.0;
 				double fovy = std::atan2(aperture * 0.5, focalLength) * 2.0;
-				setting.fovy = fovy;
-				setting.focasDistance = sample.getFocusDistance();
+				setting.fovy = (float)fovy;
+				setting.focasDistance = (float)sample.getFocusDistance();
 
 				// FStop = FocalLength / (Radius * 2)
 				// Radius = FocalLength / (2 * FStop)

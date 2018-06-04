@@ -15,7 +15,7 @@
 
 TEST_CASE("online", "[online]") {
 	SECTION("online") {
-		rt::Xor random;
+		rt::Xor64 random;
 		for (int i = 0; i < 100; ++i) {
 			std::vector<double> xs;
 			rt::OnlineVariance<double> ov;
@@ -66,12 +66,12 @@ TEST_CASE("simpson", "[simpson]") {
 			return f(b) - f(a);
 		};
 
-		rt::Xor random;
+		rt::Xor64 random;
 
 		SECTION("composite_simpson") {
 			for (int i = 0; i < 100000; ++i) {
-				double a = random.uniform(0, 5.0);
-				double b = random.uniform(0, 5.0);
+				double a = random.uniform(0.0, 5.0);
+				double b = random.uniform(0.0, 5.0);
 				double numerical = rt::composite_simpson<double>(f, 300, a, b);
 				double analytical = f_integral_analytic(a, b);
 				double diff = std::abs(numerical - analytical);
@@ -116,7 +116,7 @@ TEST_CASE("microfacet", "[microfacet]") {
 		REQUIRE(std::abs(result - 1.0) < 1.0e-9);
 	}
 	SECTION("beckmann normalization") {
-		rt::Xor random;
+		rt::Xor64 random;
 		for (int j = 0; j < 100; ++j) {
 			int sample = 0;
 
@@ -161,7 +161,7 @@ TEST_CASE("microfacet", "[microfacet]") {
 
 int main(int argc, char* const argv[])
 {
-#if 1
+#if 0
 	// テストを指定する場合
 	char* custom_argv[] = {
 		"",

@@ -141,7 +141,7 @@ namespace rt {
 	public:
 		Image(int w, int h) :_w(w), _h(h), _pixels(h*w) {
 			for (int i = 0; i < _pixels.size(); ++i) {
-				_pixels[i].random = Xor(i + 1);
+				_pixels[i].random = Xor64(i + 1);
 				for (int j = 0; j < 100; ++j) {
 					_pixels[i].random.generate();
 				}
@@ -163,7 +163,7 @@ namespace rt {
 		struct Pixel {
 			int sample = 0;
 			glm::vec3 color;
-			Xor random;
+			Xor64 random;
 		};
 		const Pixel *pixel(int x, int y) const {
 			return _pixels.data() + y * _w + x;
@@ -411,6 +411,8 @@ std::shared_ptr<rt::PTRenderer> renderer;
 
 //--------------------------------------------------------------
 void ofApp::setup(){
+	
+
 	_MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
 	_MM_SET_DENORMALS_ZERO_MODE(_MM_DENORMALS_ZERO_ON);
 
@@ -422,6 +424,8 @@ void ofApp::setup(){
 
 	scene = std::shared_ptr<rt::Scene>(new rt::Scene());
 	rt::loadFromABC(ofToDataPath("cornelbox.abc").c_str(), *scene);
+	// rt::loadFromABC(ofToDataPath("cornelbox.abc").c_str(), *scene);
+
 	renderer = std::shared_ptr<rt::PTRenderer>(new rt::PTRenderer(scene));
 
 	rt::specularAlbedo.load("specular_albedo.exr");
@@ -486,7 +490,7 @@ void ofApp::draw() {
 	}
 
 	{
-		rt::Xor random;
+		rt::Xor64 random;
 		int x = ofMap(ofGetMouseX(), 0, ofGetWidth(), 0, scene->camera.imageWidth());
 		int y = ofMap(ofGetMouseY(), 0, ofGetHeight(), 0, scene->camera.imageHeight());
 		glm::vec3 o;
