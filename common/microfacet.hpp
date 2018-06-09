@@ -3,17 +3,21 @@
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
 #include "coordinate.hpp"
+#include "serializable_buffer.hpp"
 
 namespace rt {
 	inline float chi_plus(float x) {
-		return x < 0.0f ? 0.0f : 1.0f;
+		return x <= 0.0f ? 0.0f : 1.0f;
 	}
 
 	inline float D_Beckmann(const glm::vec3 &n, const glm::vec3 &h, float alpha) {
 		float cosTheta = glm::dot(n, h);
+
+		// chi+
 		if (cosTheta < 1.0e-5) {
 			return 0.0f;
 		}
+
 		float cosTheta2 = cosTheta * cosTheta;
 		float cosTheta4 = cosTheta2 * cosTheta2;
 		float alpha2 = alpha * alpha;
@@ -44,18 +48,19 @@ namespace rt {
 	//	return 2.0 * glm::dot(N, L) * glm::dot(N, V) / (1.0 + glm::dot(L, V));
 	//}
 
-	inline float BeckmannMicrofacetBRDF_without_F(const glm::vec3 &omega_i, const glm::vec3 &omega_o, const glm::vec3 &omega_h, const glm::vec3 &Ng, float alpha) {
-		float d = D_Beckmann(Ng, omega_h, alpha);
-		float g = G2_height_correlated_beckmann(omega_i, omega_o, omega_h, Ng, alpha);
+	//inline float beckmannMicrofacetBRDF_without_F(const glm::vec3 &omega_i, const glm::vec3 &omega_o, const glm::vec3 &omega_h, const glm::vec3 &Ng, float alpha) {
+	//	float d = D_Beckmann(Ng, omega_h, alpha);
+	//	float g = G2_height_correlated_beckmann(omega_i, omega_o, omega_h, Ng, alpha);
 
-		float cos_term_wo = glm::dot(Ng, omega_o);
-		float cos_term_wi = glm::dot(Ng, omega_i);
+	//	float cos_term_wo = glm::dot(Ng, omega_o);
+	//	float cos_term_wi = glm::dot(Ng, omega_i);
 
-		return d * g / (4.0f * cos_term_wo * cos_term_wi);
-	}
+	//	return chi_plus(glm::dot(Ng, omega_i)) * chi_plus(glm::dot(Ng, omega_o)) *  d * g / (4.0f * cos_term_wo * cos_term_wi);
+	//}
 
-	struct NDFImportanceSampler {
-		static glm::vec3 sample_wi_Beckmann(PeseudoRandom *random, float alpha, glm::vec3 wo, glm::vec3 Ng) {
+	struct BeckmannImportanceSampler {
+		// サンプリング範囲が半球ではないことに注意
+		static glm::vec3 sample(PeseudoRandom *random, float alpha, glm::vec3 wo, glm::vec3 Ng) {
 			float theta = std::atan(std::sqrt(-alpha * alpha * std::log(1.0f - random->uniform())));
 			float phi = random->uniform(0.0f, glm::two_pi<double>());
 			glm::vec3 sample = polar_to_cartesian(theta, phi);
@@ -64,11 +69,12 @@ namespace rt {
 			glm::vec3 wi = glm::reflect(-wo, harf);
 			return wi;
 		}
-		static float pdfBeckmann(glm::vec3 sampled_wi, float alpha, glm::vec3 wo, glm::vec3 Ng) {
-			if (glm::dot(Ng, sampled_wi) <= 0.0f) {
-				return std::numeric_limits<float>::max();
-			}
+
+		static float pdf(glm::vec3 sampled_wi, float alpha, glm::vec3 wo, glm::vec3 Ng) {
 			glm::vec3 half = glm::normalize(sampled_wi + wo);
+
+			// glm::dot(sampled_wi, half)が0になるのは、
+			// wiとwoが正反対の向き、つまりかならず裏側であるので、普段は問題にならない
 			return D_Beckmann(Ng, half, alpha) * glm::dot(Ng, half) / (4.0f * glm::dot(sampled_wi, half));
 		}
 	};
@@ -109,6 +115,35 @@ namespace rt {
 		return f0 + (1.0f - f0) * std::pow(1.0f - cosTheta, 5);
 	}
 
-
+	class CoupledBRDFConductor {
+	public:
+		static SpecularAlbedo & specularAlbedo() {
+			static SpecularAlbedo s_specularAlbedo;
+			return s_specularAlbedo;
+		}
+		static SpecularAvgAlbedo& specularAvgAlbedo() {
+			static SpecularAvgAlbedo s_specularAvgAlbedo;
+			return s_specularAvgAlbedo;
+		}
+		static void load(const char *specularAlbedoXML, const char *specularAvgAlbedoXML) {
+			specularAlbedo().load(specularAlbedoXML);
+			specularAvgAlbedo().load(specularAvgAlbedoXML);
+		}
+	};
+	class CoupledBRDFDielectrics {
+	public:
+		static SpecularAlbedo & specularAlbedo() {
+			static SpecularAlbedo s_specularAlbedo;
+			return s_specularAlbedo;
+		}
+		static SpecularAvgAlbedo& specularAvgAlbedo() {
+			static SpecularAvgAlbedo s_specularAvgAlbedo;
+			return s_specularAvgAlbedo;
+		}
+		static void load(const char *specularAlbedoXML, const char *specularAvgAlbedoXML) {
+			specularAlbedo().load(specularAlbedoXML);
+			specularAvgAlbedo().load(specularAvgAlbedoXML);
+		}
+	};
 }
 

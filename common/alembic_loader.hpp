@@ -64,7 +64,18 @@ namespace rt {
 				values[j] = glm::vec3(value.x, value.y, value.z);
 			}
 			return values;
-		} else {
+		} else if(dataType.getExtent() == 1 && dataType.getPod() == kFloat32POD) {
+			Abc::IFloatArrayProperty arrayProp(prop.getParent(), prop.getName());
+			FloatArraySamplePtr sample;
+			arrayProp.get(sample);
+			std::vector<AttributeVariant> values(sample->size());
+			for (int j = 0; j < sample->size(); ++j) {
+				auto value = sample->get()[j];
+				values[j] = value;
+			}
+			return values;
+		}
+		else {
 			throw std::exception("unsupported dataType");
 		}
 	}
@@ -87,7 +98,7 @@ namespace rt {
 		return expands;
 	}
 
-	inline std::map<std::string, std::vector<AttributeVariant>> primitiveAttributes(ICompoundProperty props) {
+	inline std::map<std::string, std::vector<AttributeVariant>> arbGeomParamsAttributes(ICompoundProperty props) {
 		std::map<std::string, std::vector<AttributeVariant>> attributes;
 		try {
 			ICompoundProperty geom(props, ".geom");
@@ -321,10 +332,15 @@ namespace rt {
 
 			// Attributesをパース、3角形ポリゴンにする関係で、アトリビュートの配列も調整する
 			ICompoundProperty props = polyMesh.getProperties();
-			auto attributes = primitiveAttributes(props);
+			auto attributes = arbGeomParamsAttributes(props);
 			std::map<std::string, std::vector<AttributeVariant>> primAttributes;
 
 			const int32_t *indices = IndicesSample->get();
+			//int primitiveCount = 0;
+			//for (int i = 0; i < FaceCountsSample->size(); ++i) {
+			//	primitiveCount += FaceCountsSample->get()[i];
+			//}
+
 			for (int i = 0; i < FaceCountsSample->size(); ++i) {
 				auto count = FaceCountsSample->get()[i];
 
@@ -336,8 +352,10 @@ namespace rt {
 					geometry.primitives.push_back(primitive);
 
 					for (auto it = attributes.begin(); it != attributes.end(); ++it) {
-						AttributeVariant attrib = it->second[i];
-						primAttributes[it->first].push_back(attrib);
+						if (it->second.size() == FaceCountsSample->size()) {
+							AttributeVariant attrib = it->second[i];
+							primAttributes[it->first].push_back(attrib);
+						}
 					}
 				}
 				indices += count;
@@ -452,6 +470,7 @@ namespace rt {
 			const char *LambertianMaterialString = "LambertianMaterial";
 			const char *SpecularMaterialString = "SpecularMaterial";
 			const char *MicrofacetConductorMaterialString = "MicrofacetConductorMaterial";
+			const char *MicrofacetCoupledConductorMaterialString = "MicrofacetCoupledConductorMaterial";
 
 			auto material = abcGeom.primitiveAttributes.find("Material");
 			if (material != abcGeom.primitiveAttributes.end()) {
@@ -475,10 +494,30 @@ namespace rt {
 							geom.primitives[primID].material = m;
 						}
 						else if (*materialString == MicrofacetConductorMaterialString) {
-							geom.primitives[primID].material = MicrofacetConductorMaterial();
+							MicrofacetConductorMaterial m;
+							if (abcGeom.primitiveAttributes.count("roughness")) {
+								const std::vector<AttributeVariant> &roughnesses = abcGeom.primitiveAttributes["roughness"];
+								if (auto roughness = strict_variant::get<float>(&roughnesses[primID])) {
+									m.alpha = (*roughness) * (*roughness);
+								}
+							}
+							geom.primitives[primID].material = m;
+						}
+						else if (*materialString == MicrofacetCoupledConductorMaterialString) {
+							MicrofacetCoupledConductorMaterial m;
+							if (abcGeom.primitiveAttributes.count("roughness")) {
+								const std::vector<AttributeVariant> &roughnesses = abcGeom.primitiveAttributes["roughness"];
+								if (auto roughness = strict_variant::get<float>(&roughnesses[primID])) {
+									m.alpha = (*roughness) * (*roughness);
+								}
+							}
+							geom.primitives[primID].material = m;
 						}
 						else if (*materialString == SpecularMaterialString) {
 							geom.primitives[primID].material = SpecularMaterial();
+						}
+						else {
+							printf("loadFromABC unknown material string[%s]\n", materialString->c_str());
 						}
 					}
 				}

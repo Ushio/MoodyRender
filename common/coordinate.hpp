@@ -5,7 +5,6 @@
 #include <glm/ext.hpp>
 
 namespace rt {
-	// この辺も整理したい
 	inline glm::vec3 polar_to_cartesian(float theta, float phi) {
 		float sinTheta = std::sin(theta);
 		glm::vec3 v = {

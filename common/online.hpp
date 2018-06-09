@@ -38,6 +38,9 @@ namespace rt {
 		Real variance() const {
 			return _mean.sampleCount() == 0 ? Real(0.0) : _m / _mean.sampleCount();
 		}
+		int sampleCount() const {
+			return _mean.sampleCount();
+		}
 	private:
 		OnlineMean<Real> _mean;
 		Real _m = Real(0.0);
