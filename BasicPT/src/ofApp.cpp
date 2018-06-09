@@ -164,7 +164,13 @@ namespace rt {
 				float cosTheta = glm::dot(bxdf_Ng(m), wi);
 
 				Lo += emission * T;
-				T *= bxdf * cosTheta / pdf;
+
+				if(glm::any(glm::greaterThanEqual(bxdf, glm::vec3(1.0e-6f)))) {
+					T *= bxdf * cosTheta / pdf;
+				}
+				else {
+					break;
+				}
 
 				ro = (ro + rd * tmin);
 				rd = wi;
@@ -333,9 +339,15 @@ namespace rt {
 
 						auto r = radiance(*_sceneInterface, o, d, random);
 
-						if(glm::all(glm::isfinite(r)) && glm::all(glm::lessThan(r, glm::vec3(1000.0f)))) {
-							_image.add(x, y, r);
+						for (int i = 0; i < r.length(); ++i) {
+							if (glm::isfinite(r[i]) == false) {
+								r[i] = 0.0f;
+							}
+							if (r[i] < 0.0f || 1000.0f < r[i]) {
+								r[i] = 0.0f;
+							}
 						}
+						_image.add(x, y, r);
 					}
 				}
 			});

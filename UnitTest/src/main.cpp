@@ -151,60 +151,42 @@ TEST_CASE("LambertianMaterial", "[LambertianMaterial]") {
 }
 
 TEST_CASE("microfacet", "[microfacet]") {
-	//SECTION("hemisphere_adaptive_simpson") {
-	//	double result = rt::hemisphere_adaptive_simpson<double>([](double theta, double phi) {
-	//		return 1.0 / glm::pi<double>() * std::cos(theta);
-	//	}, 1.0e-12);
-	//	REQUIRE(std::abs(result - 1.0) < 1.0e-9);
-	//}
-	SECTION("hemisphere_adaptive_simpson") {
-		double result = rt::hemisphere_composite_simpson<double>([](double theta, double phi) {
-			return 1.0 / glm::pi<double>() * std::cos(theta);
-		}, 100);
-		REQUIRE(std::abs(result - 1.0) < 1.0e-8);
-	}
-
-	SECTION("beckmann normalization") {
-		using namespace rt;
-
-		rt::Xor64 random;
-		for (int j = 0; j < 100; ++j) {
-			//int sample = 0;
-
-			// alphaが小さい場合、simpsonによる積分が適さない
-			float alpha = random.uniformf(0.1f, 1.0f);
-
-			//double result = rt::hemisphere_adaptive_simpson<double>([&](double theta, double phi) {
-			//	sample++;
-
-			//	glm::vec3 Ng(0.0f, 0.0f, 1.0f);
-			//	glm::vec3 sample_m = rt::polar_to_cartesian((float)theta, (float)phi);
-			//	float cosTheta = glm::dot(Ng, sample_m);
-			//	float value = rt::D_Beckmann(Ng, sample_m, alpha) * cosTheta;
-			//	return value;
-			//}, 1.0e-12);
-			//CAPTURE(alpha);
-			//CAPTURE(sample);
-			//REQUIRE(std::abs(result - 1.0) < 1.0e-6);
-			double result = hemisphere_composite_simpson<double>([&](double theta, double phi) {
-				glm::vec3 wi = rt::polar_to_cartesian((float)theta, (float)phi);
-				glm::vec3 Ng(0.0f, 0.0f, 1.0f);
-				glm::vec3 sample_m = rt::polar_to_cartesian((float)theta, (float)phi);
-				float cosTheta = glm::dot(Ng, sample_m);
-				float value = rt::D_Beckmann(Ng, sample_m, alpha) * cosTheta;
-				return (double)value;
-			}, 500);
-			CAPTURE(result);
-			CAPTURE(alpha);
-			REQUIRE(std::abs(result - 1.0) < 1.0e-4);
-
-		}
-	}
-
 	rt::CoupledBRDFConductor::load(ofToDataPath("baked/albedo_specular_conductor.xml").c_str(), ofToDataPath("baked/albedo_specular_conductor_avg.xml").c_str());
 	rt::CoupledBRDFDielectrics::load(ofToDataPath("baked/albedo_specular_dielectrics.xml").c_str(), ofToDataPath("baked/albedo_specular_dielectrics_avg.xml").c_str());
 
-	SECTION("white furnance MicrofacetCoupledConductorMaterial") {
+	//SECTION("hemisphere_composite_simpson") {
+	//	double result = rt::hemisphere_composite_simpson<double>([](double theta, double phi) {
+	//		return 1.0 / glm::pi<double>() * std::cos(theta);
+	//	}, 100);
+	//	REQUIRE(std::abs(result - 1.0) < 1.0e-8);
+	//}
+
+	//SECTION("beckmann normalization") {
+	//	using namespace rt;
+
+	//	rt::Xor64 random;
+	//	for (int j = 0; j < 100; ++j) {
+	//		//int sample = 0;
+
+	//		// alphaが小さい場合、simpsonによる積分が適さない
+	//		float alpha = random.uniformf(0.1f, 1.0f);
+
+	//		double result = hemisphere_composite_simpson<double>([&](double theta, double phi) {
+	//			glm::vec3 wi = rt::polar_to_cartesian((float)theta, (float)phi);
+	//			glm::vec3 Ng(0.0f, 0.0f, 1.0f);
+	//			glm::vec3 sample_m = rt::polar_to_cartesian((float)theta, (float)phi);
+	//			float cosTheta = glm::dot(Ng, sample_m);
+	//			float value = rt::D_Beckmann(Ng, sample_m, alpha) * cosTheta;
+	//			return (double)value;
+	//		}, 500);
+	//		CAPTURE(result);
+	//		CAPTURE(alpha);
+	//		REQUIRE(std::abs(result - 1.0) < 1.0e-4);
+
+	//	}
+	//}
+
+	SECTION("white furnance test MicrofacetCoupledConductorMaterial") {
 		using namespace rt;
 
 		rt::Xor64 *random = new rt::Xor64();
@@ -239,31 +221,58 @@ TEST_CASE("microfacet", "[microfacet]") {
 		}
 	}
 
+	SECTION("white furnance test MC MicrofacetCoupledConductorMaterial") {
+		using namespace rt;
 
-	//rt::Xor random;
-	//for (int j = 0; j < 10; ++j) {
-	//	double alpha = random.uniform(0.1, 1.0);
-	//	rt::adaptive_simpson()
-	//	double value = integrate_composite_simpson<100>([&](double phi) {
-	//		return integrate_composite_simpson<100>([&](double theta) {
-	//			double jacobian = std::sin(theta);
-	//			Vec3 sample_m = toVector(theta, phi);
-	//			double cosTheta = sample_m.z;
-	//			double value = D_Beckman(m, sample_m, alpha) * glm::dot(m, sample_m);
-	//			// double value = D_GGX(m, sample_m, alpha) * glm::dot(m, sample_m);
-	//			return value * jacobian;
-	//		}, 0.0, glm::pi<double>() * 0.5);
-	//	}, 0.0, 2.0 * glm::pi<double>());
-	//	printf("  alpha %.4f\n", alpha);
-	//	printf("result: %.4f\n", value);
-	//}
+		rt::Xor64 *random = new rt::Xor64();
+		for (int j = 0; j < 32; ++j) {
+
+			// alphaが小さい場合、simpsonによる積分が適さない
+			float alpha = random->uniformf(0.1f, 1.0f);
+			glm::vec3 Ng(0.0f, 0.0f, 1.0f);
+			glm::vec3 wo = LambertianSampler::sample(random, Ng);
+
+			MicrofacetCoupledConductorMaterial m;
+			m.Ng = Ng;
+			m.alpha = alpha;
+			m.useFresnel = false;
+
+			OnlineMean<double> mean;
+
+			for (int i = 0; i < 500000; ++i) {
+				glm::vec3 wi = bxdf_sample(m, random, wo);
+				glm::vec3 bxdf = bxdf_evaluate(m, wo, wi);
+				float pdf = bxdf_pdf(m, wo, wi);
+				float cosTheta = glm::dot(bxdf_Ng(m), wi);
+
+				REQUIRE(std::abs(bxdf.x - bxdf.y) < 1.0e-6);
+				REQUIRE(std::abs(bxdf.y - bxdf.z) < 1.0e-6);
+
+				glm::vec3 value;
+				if (glm::any(glm::greaterThanEqual(bxdf, glm::vec3(1.0e-6f)))) {
+					value = bxdf * cosTheta / pdf;
+				}
+				else {
+					value = glm::vec3(0.0f);
+				}
+
+				mean.addSample(value.x);
+			}
+			double result = mean.mean();
+
+			CAPTURE(alpha);
+			CAPTURE(glm::dot(Ng, wo));
+			REQUIRE(std::abs(result - 1.0) < 1.0e-2);
+			printf("%f\n", result);
+		}
+	}
 }
 
 
 
 int main(int argc, char* const argv[])
 {
-#if 0
+#if 1
 	// テストを指定する場合
 	char* custom_argv[] = {
 		"",

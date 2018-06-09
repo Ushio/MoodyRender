@@ -131,6 +131,8 @@ namespace rt {
 
 			float brdf_without_f = d * g / (4.0f * cos_term_wo * cos_term_wi);
 
+			glm::vec3 brdf = glm::vec3(brdf_without_f);
+
 			if (useFresnel) {
 				glm::vec3 eta(0.15557f, 0.42415f, 1.3821f);
 				glm::vec3 k(3.6024f, 2.4721f, 1.9155f);
@@ -141,9 +143,10 @@ namespace rt {
 					fresnel_unpolarized(eta.g, k.g, cosThetaFresnel),
 					fresnel_unpolarized(eta.b, k.b, cosThetaFresnel)
 				);
-				return f * brdf_without_f;
+				brdf = f * brdf_without_f;
 			}
-			return glm::vec3(brdf_without_f);
+
+			return brdf;
 		}
 
 		glm::vec3 sample(PeseudoRandom *random, const glm::vec3 &wo) const override {
@@ -261,8 +264,8 @@ namespace rt {
 		auto f = [](const IMaterial &m, PeseudoRandom *random, const glm::vec3 &wo) { return m.sample(random, wo); };
 		return strict_variant::apply_visitor(std::bind(f, std::placeholders::_1, random, wo), m);
 	}
-	inline float bxdf_pdf(const Material &m, const glm::vec3 &wo, const glm::vec3 &wi) {
-		auto f = [](const IMaterial &m, const glm::vec3 &wo, const glm::vec3 &wi) { return m.pdf(wo, wi); };
-		return strict_variant::apply_visitor(std::bind(f, std::placeholders::_1, wo, wi), m);
+	inline float bxdf_pdf(const Material &m, const glm::vec3 &wo, const glm::vec3 &sampled_wi) {
+		auto f = [](const IMaterial &m, const glm::vec3 &wo, const glm::vec3 &sampled_wi) { return m.pdf(wo, sampled_wi); };
+		return strict_variant::apply_visitor(std::bind(f, std::placeholders::_1, wo, sampled_wi), m);
 	}
 }
