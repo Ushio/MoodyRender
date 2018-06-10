@@ -59,6 +59,10 @@ namespace rt {
 		// common member
 		glm::vec3 Ng;
 
+		virtual bool isEmission() const {
+			return false;
+		}
+
 		// evaluate emission
 		virtual glm::vec3 emission(const glm::vec3 &wo) const {
 			return glm::vec3(0.0f);
@@ -81,13 +85,16 @@ namespace rt {
 		glm::vec3 Le;
 		glm::vec3 R;
 
-		bool isEmissive() const {
+		bool isEmission() const override {
 			return glm::any(glm::greaterThanEqual(Le, glm::vec3(glm::epsilon<float>())));
 		}
 		glm::vec3 emission(const glm::vec3 &wo) const override {
 			return Le;
 		}
 		glm::vec3 bxdf(const glm::vec3 &wo, const glm::vec3 &wi) const override {
+			if (glm::dot(Ng, wi) < 0.0f || glm::dot(Ng, wo) < 0.0f) {
+				return glm::vec3(0.0f);
+			}
 			return glm::vec3(R) * glm::one_over_pi<float>();
 		}
 		glm::vec3 sample(PeseudoRandom *random, const glm::vec3 &wo) const override {
@@ -320,14 +327,21 @@ namespace rt {
 		};
 		struct GetNg {
 			template <class T>
-			glm::vec3 operator()(T &m) const {
+			glm::vec3 operator()(const T &m) const {
 				return m.Ng;
 			}
 		};
 	}
+	inline bool bxdf_is_emissive(const Material &m) {
+		return strict_variant::apply_visitor([](const IMaterial &m) { return m.isEmission(); }, m);
+	}
 	inline glm::vec3 bxdf_Ng(const Material &m) {
 		return strict_variant::apply_visitor(MaterialVisitor::GetNg(), m);
 	}
+	inline void bxdf_SetNg(Material &m, const glm::vec3 &Ng) {
+		strict_variant::apply_visitor(MaterialVisitor::SetNg(Ng), m);
+	}
+
 	inline glm::vec3 bxdf_emission(const Material &m, const glm::vec3 &wo) {
 		auto f = [](const IMaterial &m, const glm::vec3 &wo) { return m.emission(wo); };
 		return strict_variant::apply_visitor(std::bind(f, std::placeholders::_1, wo), m);

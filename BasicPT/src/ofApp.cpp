@@ -13,6 +13,8 @@
 
 #include "ofApp.h"
 
+#define DEBUG_MODE 0
+
 namespace rt {
 	inline void EmbreeErorrHandler(void* userPtr, RTCError code, const char* str) {
 		printf("Embree Error [%d] %s\n", code, str);
@@ -54,6 +56,24 @@ namespace rt {
 			rtcCommitScene(_embreeScene);
 
 			rtcInitIntersectContext(&_context);
+
+
+			// Emission
+			for (int i = 0; i < _scene->geometries.size(); ++i) {
+				const Geometry& g = _scene->geometries[i];
+				for (int j = 0; j < g.primitives.size(); ++j) {
+					if (bxdf_is_emissive(g.primitives[j].material)) {
+						EmissivePrimitiveRef ref;
+						ref.geometeryIndex = i;
+						ref.primitiveIndex = j;
+						auto indices = g.primitives[j].indices;
+						ref.area = triArea(g.points[indices.x].P, g.points[indices.y].P, g.points[indices.z].P);
+						ref.Ng = triNg(g.points[indices.x].P, g.points[indices.y].P, g.points[indices.z].P, false);
+						_emissivePrimitives.push_back(ref);
+					}
+				}
+			}
+			_emissionSampler = ValueProportionalSampler<float>(_emissivePrimitives, [](const EmissivePrimitiveRef& ref) { return ref.area; });
 		}
 		~SceneInterface() {
 			rtcReleaseScene(_embreeScene);
@@ -61,6 +81,34 @@ namespace rt {
 		}
 		SceneInterface(const SceneInterface &) = delete;
 		void operator=(const SceneInterface &) = delete;
+
+		bool occluded(const glm::vec3 &p, const glm::vec3 &q, float bias = 1.0e-5f) const {
+			glm::vec3 rd = q - p;
+			//float d = glm::distance(p, q);
+			//glm::vec3 rd = (q - p) / d;
+
+			RTCRay ray;
+			ray.org_x = p.x;
+			ray.org_y = p.y;
+			ray.org_z = p.z;
+			ray.dir_x = rd.x;
+			ray.dir_y = rd.y;
+			ray.dir_z = rd.z;
+			ray.time = 0.0f;
+
+			float tfar = 1.0f - bias;
+
+			ray.tfar = tfar;
+			ray.tnear = bias;
+
+			ray.mask = 0;
+			ray.id = 0;
+			ray.flags = 0;
+
+			rtcOccluded1(_embreeScene, &_context, &ray);
+			
+			return ray.tfar != tfar;
+		}
 
 		bool intersect(const glm::vec3 &ro, const glm::vec3 &rd, float tnear, Material *material, float *tmin) const {
 			RTCRayHit rayhit;
@@ -91,15 +139,30 @@ namespace rt {
 			int index = _geomIDToIndex.find(rayhit.hit.geomID)->second;
 			const auto &prim = _scene->geometries[index].primitives[rayhit.hit.primID];
 			*material = prim.material;
-			glm::vec3 NgUnnormalized(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z);
+			glm::vec3 unnormalized(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z);
 
-			strict_variant::apply_visitor(MaterialVisitor::SetNg(glm::normalize(NgUnnormalized)), *material);
+			bxdf_SetNg(*material, glm::normalize(unnormalized));
 
 			return true;
 		}
 
 		const Camera &camera() const {
 			return _scene->camera;
+		}
+
+		void sampleEmissiveUniform(PeseudoRandom *random, glm::vec3 *p, Material *m) const {
+			int index = _emissionSampler.sample(random);
+			auto prim = _emissivePrimitives[index];
+			const Geometry& g = _scene->geometries[prim.geometeryIndex];
+			auto material = g.primitives[prim.primitiveIndex].material;
+			auto indices = g.primitives[prim.primitiveIndex].indices;
+
+			bxdf_SetNg(material, prim.Ng);
+*m = material;
+*p = uniform_on_triangle(random->uniformf(), random->uniformf()).evaluate(g.points[indices.x].P, g.points[indices.y].P, g.points[indices.z].P);
+		}
+		float emissiveArea() const {
+			return _emissionSampler.sumValue();
 		}
 
 		std::shared_ptr<rt::Scene> _scene;
@@ -109,15 +172,14 @@ namespace rt {
 
 		std::unordered_map<unsigned int, int> _geomIDToIndex;
 
-		//struct EmissivePrimitiveRef {
-		//	int geometeryIndex;
-		//	int primitiveIndex;
-		//	double area;
-		//};
-		//std::vector<EmissivePrimitiveRef> _emissivePrimitives;
-		//void sample() {
-		//	auto v = ValueProportionalSampler<double>(_emissivePrimitives, [](const EmissivePrimitiveRef &ref) { return (double)ref.area; });
-		//}
+		struct EmissivePrimitiveRef {
+			int geometeryIndex;
+			int primitiveIndex;
+			float area;
+			glm::vec3 Ng;
+		};
+		std::vector<EmissivePrimitiveRef> _emissivePrimitives;
+		ValueProportionalSampler<float> _emissionSampler;
 	};
 
 	class Image {
@@ -160,8 +222,8 @@ namespace rt {
 		std::vector<Pixel> _pixels;
 	};
 
-	inline float GTerm(const glm::vec3 &p, const glm::vec3 &pNg, const glm::vec3 &q, const glm::vec3 &qNg) {
-		return glm::dot(p, pNg) * glm::dot(q, qNg) / glm::distance2(p, q);
+	inline float GTerm(const glm::vec3 &p, float cosThetaP, const glm::vec3 &q, float cosThetaQ) {
+		return cosThetaP * cosThetaQ / glm::distance2(p, q);
 	}
 
 	inline glm::vec3 radiance(const rt::SceneInterface &scene, glm::vec3 ro, glm::vec3 rd, PeseudoRandom *random) {
@@ -173,15 +235,48 @@ namespace rt {
 			glm::vec3 wo = -rd;
 
 			if (scene.intersect(ro, rd, 0.00001f, &m, &tmin)) {
+				//{
+				//	glm::vec3 p = ro + rd * tmin;
+
+				//	glm::vec3 q;
+				//	Material sampledM;
+				//	scene.sampleEmissiveUniform(random, &q, &sampledM);
+
+				//	glm::vec3 wi = glm::normalize(q - p);
+				//	glm::vec3 emission = bxdf_emission(sampledM, -wi);
+
+				//	glm::vec3 bxdf = bxdf_evaluate(m, wo, wi);
+				//	float pdf_area = (1.0f / scene.emissiveArea());
+
+				//	float cosTheta = glm::dot(bxdf_Ng(m), wi);
+
+				//	float cosThetaP = glm::abs(glm::dot(bxdf_Ng(m), wi));
+				//	float cosThetaQ = glm::dot(bxdf_Ng(sampledM), -wi);
+
+				//	float g = GTerm(p, cosThetaP, q, cosThetaQ);
+
+				//	glm::vec3 contribution = T * bxdf * emission * g;
+
+				//	/* 裏面は発光しない */
+				//	if (0.0f < cosThetaQ && glm::any(glm::greaterThanEqual(contribution, glm::vec3(glm::epsilon<float>())))) {
+				//		if (scene.occluded(p, q) == false) {
+				//			Lo += contribution / pdf_area;
+				//		}
+				//	}
+				//}
+
 				glm::vec3 wi = bxdf_sample(m, random, wo);
 				glm::vec3 bxdf = bxdf_evaluate(m, wo, wi);
 				glm::vec3 emission = bxdf_emission(m, wo);
 				float pdf = bxdf_pdf(m, wo, wi);
-				float cosTheta = glm::dot(bxdf_Ng(m), wi);
+				float cosTheta = std::abs(glm::dot(bxdf_Ng(m), wi));
 
+				//if (i == 0) {
+				//	Lo += emission * T;
+				//}
 				Lo += emission * T;
 
-				if(glm::any(glm::greaterThanEqual(bxdf, glm::vec3(1.0e-6f)))) {
+				if (glm::any(glm::greaterThanEqual(bxdf, glm::vec3(1.0e-6f)))) {
 					T *= bxdf * cosTheta / pdf;
 				}
 				else {
@@ -202,130 +297,28 @@ namespace rt {
 	//	glm::vec3 Lo;
 	//	glm::vec3 T(1.0);
 	//	for (int i = 0; i < 10; ++i) {
-	//		Material mat;
+	//		Material m;
 	//		float tmin = std::numeric_limits<float>::max();
+	//		glm::vec3 wo = -rd;
 
-	//		if (scene.intersect(ro, rd, 0.00001f, &mat, &tmin)) {
-	//			if (auto material = strict_variant::get<LambertianMaterial>(&mat)) {
-	//				glm::vec3 wi = LambertianSampler::sample(random, material->Ng);
-	//				float cos_term = glm::dot(wi, material->Ng);
+	//		if (scene.intersect(ro, rd, 0.00001f, &m, &tmin)) {
+	//			glm::vec3 wi = bxdf_sample(m, random, wo);
+	//			glm::vec3 bxdf = bxdf_evaluate(m, wo, wi);
+	//			glm::vec3 emission = bxdf_emission(m, wo);
+	//			float pdf = bxdf_pdf(m, wo, wi);
+	//			float cosTheta = glm::dot(bxdf_Ng(m), wi);
 
-	//				//glm::vec3 sample = sample_cosine_weighted_hemisphere_brdf(random);
-	//				//float pdf_omega = cosine_weighted_hemisphere_pdf_brdf(sample);
-	//				//glm::vec3 wi = from_bxdf(material->Ng, sample);
+	//			Lo += emission * T;
 
-	//				glm::vec3 brdf = material->R * glm::vec3(glm::one_over_pi<float>());
-	//				//float cos_term = abs_cos_theta_bxdf(sample);
-
-	//				Lo += material->Le * T;
-
-	//				T *= brdf * cos_term / LambertianSampler::pdf(wi, material->Ng);
-
-	//				ro = (ro + rd * tmin);
-	//				rd = wi;
+	//			if(glm::any(glm::greaterThanEqual(bxdf, glm::vec3(1.0e-6f)))) {
+	//				T *= bxdf * cosTheta / pdf;
 	//			}
-	//			else if (auto material = strict_variant::get<MicrofacetCoupledConductorMaterial>(&mat)) {
-	//				glm::vec3 wo = -rd;
-	//				float alpha = 0.3f;
-
-	//				/*
-	//				 コサイン重点サンプリング
-	//				*/
-	//				//glm::vec3 sample = sample_cosine_weighted_hemisphere_brdf(random);
-	//				//float pdf_omega = cosine_weighted_hemisphere_pdf_brdf(sample);
-	//				//glm::vec3 wi = from_bxdf(material->Ng, sample);
-
-	//				/*
-	//				 ハーフベクトルの重点サンプリング
-	//				*/
-	//				//float theta = std::atan(std::sqrt(-alpha * alpha * std::log(1.0f - random->uniform())));
-	//				//float phi = random->uniform(0.0f, glm::two_pi<double>());
-	//				//glm::vec3 sample = polar_to_cartesian(theta, phi);
-	//				//glm::vec3 harf = from_bxdf(material->Ng, sample);
-	//				//glm::vec3 wi = glm::reflect(-wo, harf);
-	//				//float pdf_omega = D_Beckmann(material->Ng, harf, alpha) * glm::dot(material->Ng, harf) / (4.0f * glm::dot(wi, harf));
-	//				//if (glm::dot(material->Ng, wi) <= 0.0f) {
-	//				//	T = glm::vec3(0.0);
-	//				//	break;
-	//				//}
-
-	//				// 
-	//				//glm::vec3 wi = NDFImportanceSampler::sample_wi_Beckmann(random, alpha, wo, material->Ng);
-	//				//float pdf_omega = NDFImportanceSampler::pdfBeckmann(wi, alpha, wo, material->Ng);
-
-	//				// ミックス 重点サンプリング
-	//				glm::vec3 wi;
-	//				// float spAlbedo = CoupledBRDFDielectrics::specularAlbedo().sample(alpha, glm::dot(material->Ng, wo));
-	//				float spAlbedo = CoupledBRDFConductor::specularAlbedo().sample(alpha, glm::dot(material->Ng, wo));
-
-	//				if (random->uniformf() < spAlbedo) {
-	//					wi = BeckmannImportanceSampler::sample(random, alpha, wo, material->Ng);
-	//				}
-	//				else {
-	//					wi = LambertianSampler::sample(random, material->Ng);
-	//				}
-
-	//				float pdf_omega = 
-	//					spAlbedo * BeckmannImportanceSampler::pdf(wi, alpha, wo, material->Ng)
-	//					+
-	//					(1.0f - spAlbedo) * LambertianSampler::pdf(wi, material->Ng);
-
-	//				glm::vec3 h = glm::normalize(wi + wo);
-	//				float d = D_Beckmann(material->Ng, h, alpha);
-	//				float g = G2_height_correlated_beckmann(wi, wo, h, material->Ng, alpha);
-
-	//				float cos_term_wo = glm::dot(material->Ng, wo);
-	//				float cos_term_wi = glm::dot(material->Ng, wi);
-
-	//				float brdf_without_f = d * g / (4.0f * cos_term_wo * cos_term_wi);
-
-	//				glm::vec3 eta(0.15557f, 0.42415f, 1.3821f);
-	//				glm::vec3 k(3.6024f, 2.4721f, 1.9155f);
-
-	//				float cosThetaFresnel = glm::dot(h, wo);
-	//				glm::vec3 f = glm::vec3(
-	//					fresnel_unpolarized(eta.r, k.r, cosThetaFresnel),
-	//					fresnel_unpolarized(eta.g, k.g, cosThetaFresnel),
-	//					fresnel_unpolarized(eta.b, k.b, cosThetaFresnel)
-	//				);
-	//				// glm::vec3 f = glm::vec3(fresnel_dielectrics(cosThetaFresnel));
-
-	//				glm::vec3 brdf_spec = f * brdf_without_f;
-
-	//				// glm::vec3 kLambda(1.0f, 0.447067, 0.246); // 適当
-
-	//				glm::vec3 kLambda(
-	//					fresnel_unpolarized(eta.r, k.r, 0.0),
-	//					fresnel_unpolarized(eta.g, k.g, 0.0),
-	//					fresnel_unpolarized(eta.b, k.b, 0.0)
-	//				);
-
-	//				//glm::vec3 brdf_diff = kLambda
-	//				//	* (1.0f - CoupledBRDFDielectrics::specularAlbedo().sample(alpha, cos_term_wo))
-	//				//	* (1.0f - CoupledBRDFDielectrics::specularAlbedo().sample(alpha, cos_term_wi))
-	//				//	/ (glm::pi<float>() * (1.0f - CoupledBRDFDielectrics::specularAvgAlbedo().sample(alpha)));
-	//				glm::vec3 brdf_diff = kLambda
-	//					* (1.0f - CoupledBRDFConductor::specularAlbedo().sample(alpha, cos_term_wo))
-	//					* (1.0f - CoupledBRDFConductor::specularAlbedo().sample(alpha, cos_term_wi))
-	//					/ (glm::pi<float>() * (1.0f - CoupledBRDFConductor::specularAvgAlbedo().sample(alpha)));
-
-	//				// glm::vec3 brdf = brdf_spec + brdf_diff;
-	//				glm::vec3 brdf = brdf_spec;
-
-	//				if (glm::dot(material->Ng, wi) <= 0.0f) {
-	//					brdf = glm::vec3();
-	//				}
-
-	//				T *= brdf * cos_term_wi / pdf_omega;
-
-	//				ro = (ro + rd * tmin);
-	//				rd = wi;
+	//			else {
+	//				break;
 	//			}
-	//			else if (auto material = strict_variant::get<SpecularMaterial>(&mat)) {
-	//				glm::vec3 wi = glm::reflect(rd, material->Ng);
-	//				ro = (ro + rd * tmin);
-	//				rd = wi;
-	//			}
+
+	//			ro = (ro + rd * tmin);
+	//			rd = wi;
 	//		}
 	//		else {
 	//			break;
@@ -333,6 +326,7 @@ namespace rt {
 	//	}
 	//	return Lo;
 	//}
+
 
 	class PTRenderer {
 	public:
@@ -345,6 +339,37 @@ namespace rt {
 		void step() {
 			_steps++;
 
+#if DEBUG_MODE
+			int focusX = 200;
+			int focusY = 200;
+
+			for (int y = 0; y < _scene->camera.imageHeight(); ++y) {
+				for (int x = 0; x < _scene->camera.imageWidth(); ++x) {
+					if (x != focusX || y != focusY) {
+						continue;
+					}
+					// PeseudoRandom *random = &_image.pixel(x, y)->random;
+					auto cp = _image.pixel(x, y)->random;
+					PeseudoRandom *random = &cp;
+
+					glm::vec3 o;
+					glm::vec3 d;
+					_scene->camera.sampleRay(random, x, y, &o, &d);
+
+					auto r = radiance(*_sceneInterface, o, d, random);
+
+					for (int i = 0; i < r.length(); ++i) {
+						if (glm::isfinite(r[i]) == false) {
+							r[i] = 0.0f;
+						}
+						if (r[i] < 0.0f || 1000.0f < r[i]) {
+							r[i] = 0.0f;
+						}
+					}
+					_image.add(x, y, r);
+				}
+			}
+#else
 			tbb::parallel_for(tbb::blocked_range<int>(0, _scene->camera.imageHeight()), [&](const tbb::blocked_range<int> &range) {
 				for (int y = range.begin(); y < range.end(); ++y) {
 					for (int x = 0; x < _scene->camera.imageWidth(); ++x) {
@@ -359,7 +384,7 @@ namespace rt {
 							if (glm::isfinite(r[i]) == false) {
 								r[i] = 0.0f;
 							}
-							if (r[i] < 0.0f || 1000.0f < r[i]) {
+							if (r[i] < 0.0f || 100.0f < r[i]) {
 								r[i] = 0.0f;
 							}
 						}
@@ -367,6 +392,7 @@ namespace rt {
 					}
 				}
 			});
+#endif
 		}
 		int stepCount() const {
 			return _steps;
@@ -432,20 +458,7 @@ void ofApp::setup(){
 
 //--------------------------------------------------------------
 void ofApp::update() {
-	renderer->step();
 
-	if (ofGetFrameNum() % 5 == 0) {
-		_image.setFromPixels(toOf(renderer->_image));
-	}
-
-	if (renderer->stepCount() == 512) {
-		_image.setFromPixels(toOf(renderer->_image));
-		_image.save("512spp.png");
-	}
-	if (renderer->stepCount() == 1024) {
-		_image.setFromPixels(toOf(renderer->_image));
-		_image.save("1024spp.png");
-	}
 }
 
 //--------------------------------------------------------------
@@ -519,6 +532,44 @@ void ofApp::draw() {
 			ofDrawLine(o.x, o.y, o.z, p.x, p.y, p.z);
 		}
 	}
+
+	{
+		renderer->step();
+
+		if (ofGetFrameNum() % 5 == 0) {
+			_image.setFromPixels(toOf(renderer->_image));
+		}
+
+		if (renderer->stepCount() == 512) {
+			_image.setFromPixels(toOf(renderer->_image));
+			_image.save("512spp.png");
+		}
+		if (renderer->stepCount() == 1024) {
+			_image.setFromPixels(toOf(renderer->_image));
+			_image.save("1024spp.png");
+		}
+	}
+
+	//{
+	//	static rt::Xor64 random;
+
+
+	//	ofMesh mesh;
+	//	mesh.setMode(OF_PRIMITIVE_POINTS);
+
+	//	ofSetColor(255, 0, 0);
+
+	//	for (int i = 0; i < 3000; ++i) {
+	//		glm::vec3 p;
+	//		rt::Material m;
+	//		renderer->sceneInterface().sampleEmissiveUniform(&random, &p, &m);
+	//		mesh.addVertex(p);
+
+	//		ofDrawLine(p, p + rt::bxdf_Ng(m) * 0.2f);
+	//	}
+
+	//	mesh.draw();
+	//}
 
 	_camera.end();
 
