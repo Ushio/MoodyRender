@@ -3,6 +3,7 @@
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
 #include "coordinate.hpp"
+#include "composite_simpson.hpp"
 #include "serializable_buffer.hpp"
 
 namespace rt {
@@ -111,9 +112,125 @@ namespace rt {
 		return a * b;
 	}
 
-	float fresnel_shlick(float f0, float cosTheta) {
+	inline float fresnel_shlick(float f0, float cosTheta) {
 		return f0 + (1.0f - f0) * std::pow(1.0f - cosTheta, 5);
 	}
+
+
+
+	class ValueProportionalSampler {
+	public:
+		ValueProportionalSampler() {}
+		ValueProportionalSampler(const std::vector<double> &values) {
+			double sumValue = 0.0;
+			for (int i = 0; i < values.size(); ++i) {
+				sumValue += values[i];
+				_cumulativeAreas.push_back(sumValue);
+			}
+			_sumValue = sumValue;
+			_values = values;
+		}
+		int sample(PeseudoRandom *random) const {
+			double area_at = random->uniform(0.0, _sumValue);
+			auto it = std::upper_bound(_cumulativeAreas.begin(), _cumulativeAreas.end(), area_at);
+			std::size_t index = std::distance(_cumulativeAreas.begin(), it);
+			index = std::min(index, _cumulativeAreas.size() - 1);
+			return (int)index;
+		}
+		double sumValue() const {
+			return _sumValue;
+		}
+		double probability(int index) const {
+			return _values[index] / _sumValue;
+		}
+		int size() const {
+			return _values.size();
+		}
+	private:
+		double _sumValue = 0.0;
+		std::vector<double> _values;
+		std::vector<double> _cumulativeAreas;
+	};
+
+	inline double CoupledBRDF_I(double theta, double alpha, std::function<double(double, double)> specularAlbedo) {
+		return rt::composite_simpson<double>([&](double xi) {
+			double cosTheta = std::cos(xi);
+			return (1.0 - specularAlbedo(alpha, cosTheta)) * cosTheta;
+		}, 128, 0.0, theta);
+	}
+
+	class CoupledBRDFSampler {
+	public:
+		// specularAlbedo(alpha, cosTheta)
+		void build(std::function<double(double, double)> specularAlbedo) {
+			int kAlphaCount = 32;
+			int kSampleBlockCount = 128;
+
+			_discreteSamplers.resize(kAlphaCount);
+			for (int i = 0; i < kAlphaCount; ++i) {
+				float alpha = indexToAlpha(i, kAlphaCount);
+
+				std::vector<double> values(kSampleBlockCount);
+				for (int j = 0; j < kSampleBlockCount; ++j) {
+					values[j] = CoupledBRDF_I(indexToTheta(j, kSampleBlockCount), alpha, specularAlbedo);
+				}
+				_discreteSamplers[i] = ValueProportionalSampler(values);
+			}
+		}
+		float sampleTheta(float alpha, PeseudoRandom *random) const {
+			int alphaIndex = alphaToIndex(alpha, _discreteSamplers.size());
+			const ValueProportionalSampler &sampler = _discreteSamplers[alphaIndex];
+			int indexTheta = sampler.sample(random);
+			auto thetaRange = indexToThetaRange(indexTheta, sampler.size());
+			return random->uniformf(thetaRange.first, thetaRange.second);
+		}
+		float probability(float alpha, float theta) const {
+			int alphaIndex = alphaToIndex(alpha, _discreteSamplers.size());
+			const ValueProportionalSampler &sampler = _discreteSamplers[alphaIndex];
+			int thetaIndex = thetaToIndex(theta, sampler.size());
+			return sampler.probability(thetaIndex);
+		}
+		int thetaSize(float alpha) const {
+			int alphaIndex = alphaToIndex(alpha, _discreteSamplers.size());
+			const ValueProportionalSampler &sampler = _discreteSamplers[alphaIndex];
+			return sampler.size();
+		}
+	private:
+		// 0     0.5     1
+		// |------|------|
+		int alphaToIndex(float alpha, int n)const
+		{
+			int index = (int)(alpha * n);
+			index = std::min(index, n - 1);
+			index = std::max(index, 0);
+			return index;
+		}
+		float indexToAlpha(int index, int n) const {
+			float wide = 1.0f / n;
+			return wide * 0.5f + index * wide;
+		}
+
+		// 0     0.5     1
+		// |------|------|
+		int thetaToIndex(float theta, int n) const
+		{
+			int index = (int)((theta * 2.0f / glm::pi<float>()) * n);
+			index = std::min(index, n - 1);
+			index = std::max(index, 0);
+			return index;
+		}
+		float indexToTheta(int index, int n) const {
+			float wide = glm::pi<float>() * 0.5f / n;
+			return wide * 0.5f + index * wide;
+		}
+		std::pair<float, float> indexToThetaRange(int index, int n) const {
+			float wide = glm::pi<float>() * 0.5f / n;
+			return std::make_pair(index * wide, (index + 1) * wide);
+		}
+
+		// alpha => table
+		std::vector<ValueProportionalSampler> _discreteSamplers;
+	};
 
 	class CoupledBRDFConductor {
 	public:
@@ -125,9 +242,17 @@ namespace rt {
 			static SpecularAvgAlbedo s_specularAvgAlbedo;
 			return s_specularAvgAlbedo;
 		}
+		static CoupledBRDFSampler &sampler() {
+			static CoupledBRDFSampler s_sampler;
+			return s_sampler;
+		}
+
 		static void load(const char *specularAlbedoXML, const char *specularAvgAlbedoXML) {
 			specularAlbedo().load(specularAlbedoXML);
 			specularAvgAlbedo().load(specularAvgAlbedoXML);
+			sampler().build([](double alpha, double cosTheta) {
+				return rt::CoupledBRDFConductor::specularAlbedo().sample(alpha, cosTheta);
+			});
 		}
 	};
 	class CoupledBRDFDielectrics {
@@ -140,9 +265,16 @@ namespace rt {
 			static SpecularAvgAlbedo s_specularAvgAlbedo;
 			return s_specularAvgAlbedo;
 		}
+		static CoupledBRDFSampler &sampler() {
+			static CoupledBRDFSampler s_sampler;
+			return s_sampler;
+		}
 		static void load(const char *specularAlbedoXML, const char *specularAvgAlbedoXML) {
 			specularAlbedo().load(specularAlbedoXML);
 			specularAvgAlbedo().load(specularAvgAlbedoXML);
+			sampler().build([](double alpha, double cosTheta) {
+				return rt::CoupledBRDFDielectrics::specularAlbedo().sample(alpha, cosTheta);
+			});
 		}
 	};
 }

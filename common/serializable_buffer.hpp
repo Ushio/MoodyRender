@@ -41,10 +41,10 @@ namespace rt {
 			tbb::parallel_for(tbb::blocked_range<int>(0, _cosThetaSize), [&](const tbb::blocked_range<int> &range) {
 				for (int j = range.begin(); j < range.end(); ++j) {
 					// cosTheta == 0 を回避するために j == 0 を回避する
-					float cosTheta = (float)std::max(j, 1) / (_cosThetaSize + 1);
+					float cosTheta = (float)std::max(j, 1) / (_cosThetaSize - 1);
 					for (int i = 0; i < _alphaSize; ++i) {
 						// alpha == 0 を回避するために i == 0 を回避する
-						float alpha = (float)std::max(i, 1) / (_alphaSize + 1);
+						float alpha = (float)std::max(i, 1) / (_alphaSize - 1);
 						set(i, j, evaluate(alpha, cosTheta));
 					}
 
@@ -109,7 +109,7 @@ namespace rt {
 
 			for (int i = 0; i < _alphaSize; ++i) {
 				// alpha == 0 を回避するために i == 0 を回避する
-				float alpha = (float)std::max(i, 1) / (_alphaSize + 1);
+				float alpha = (float)std::max(i, 1) / (_alphaSize - 1);
 				set(i, evaluate(alpha));
 			}
 		}
@@ -137,6 +137,77 @@ namespace rt {
 			archive(CEREAL_NVP(_alphaSize), CEREAL_NVP(_values));
 		}
 		int _alphaSize = 0;
+		std::vector<float> _values;
+	};
+
+
+	class I_Dot_Inverse {
+	public:
+		I_Dot_Inverse() {}
+
+		void save(const char *filename) {
+			std::ofstream ofs(filename);
+			{
+				cereal::XMLOutputArchive o_archive(ofs);
+				o_archive(*this);
+			}
+		}
+		void load(const char *filename) {
+			std::ifstream ifs(filename);
+			{
+				cereal::XMLInputArchive i_archive(ifs);
+				i_archive(*this);
+			}
+		}
+
+		// evaluate I_dot_inverse(alpha, u)
+		void build(int alphaSize, int uSize, std::function<float(float, float)> I_dot_inverse) {
+			_alphaSize = alphaSize;
+			_uSize = uSize;
+			_values.resize(_alphaSize * _uSize);
+
+			tbb::parallel_for(tbb::blocked_range<int>(0, _uSize), [&](const tbb::blocked_range<int> &range) {
+				for (int j = range.begin(); j < range.end(); ++j) {
+					float u = (float)j / (_uSize - 1);
+					for (int i = 0; i < _alphaSize; ++i) {
+						// alpha == 0 を回避するために i == 0 を回避する
+						float alpha = (float)std::max(i, 1) / (_alphaSize - 1);
+						float value = I_dot_inverse(1.0 - alpha, u);
+						set(i, j, value);
+					}
+
+					printf("%d line done\n", j);
+				}
+			});
+		}
+		float sample(float alpha, float u) const {
+			return bicubic_2d(alpha, u, _alphaSize, _uSize, [&](int x, int y) {
+				return get(x, y);
+			});
+		}
+		void set(int x, int y, float value) {
+			_values[y * _alphaSize + x] = value;
+		}
+		float get(int x, int y) const {
+			return _values[y * _alphaSize + x];
+		}
+		int alphaSize() const {
+			return _alphaSize;
+		}
+		int uSize() const {
+			return _uSize;
+		}
+	private:
+		friend class cereal::access;
+
+		template<class Archive>
+		void serialize(Archive & archive)
+		{
+			archive(CEREAL_NVP(_alphaSize), CEREAL_NVP(_uSize), CEREAL_NVP(_values));
+		}
+
+		int _alphaSize = 0;
+		int _uSize = 0;
 		std::vector<float> _values;
 	};
 }

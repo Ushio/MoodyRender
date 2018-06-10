@@ -208,8 +208,29 @@ namespace rt {
 
 			return brdf_spec + brdf_diff;
 		}
+		//glm::vec3 sample(PeseudoRandom *random, const glm::vec3 &wo) const override {
+		//	// ミックス 重点サンプリング
+		//	glm::vec3 wi;
+		//	float spAlbedo = CoupledBRDFConductor::specularAlbedo().sample(alpha, glm::dot(Ng, wo));
+
+		//	if (random->uniformf() < spAlbedo) {
+		//		wi = BeckmannImportanceSampler::sample(random, alpha, wo, Ng);
+		//	}
+		//	else {
+		//		wi = LambertianSampler::sample(random, Ng);
+		//	}
+		//	return wi;
+		//}
+		//float pdf(const glm::vec3 &wo, const glm::vec3 &sampled_wi) const override {
+		//	float spAlbedo = CoupledBRDFConductor::specularAlbedo().sample(alpha, glm::dot(Ng, wo));
+		//	float pdf_omega = 
+		//		spAlbedo * BeckmannImportanceSampler::pdf(sampled_wi, alpha, wo, Ng)
+		//		+
+		//		(1.0f - spAlbedo) * LambertianSampler::pdf(sampled_wi, Ng);
+		//	return pdf_omega;
+		//}
+
 		glm::vec3 sample(PeseudoRandom *random, const glm::vec3 &wo) const override {
-			// ミックス 重点サンプリング
 			glm::vec3 wi;
 			float spAlbedo = CoupledBRDFConductor::specularAlbedo().sample(alpha, glm::dot(Ng, wo));
 
@@ -217,16 +238,24 @@ namespace rt {
 				wi = BeckmannImportanceSampler::sample(random, alpha, wo, Ng);
 			}
 			else {
-				wi = LambertianSampler::sample(random, Ng);
+				float theta = CoupledBRDFConductor::sampler().sampleTheta(alpha, random);
+				glm::vec3 sample = polar_to_cartesian(theta, random->uniformf(0.0f, glm::two_pi<float>()));
+				ArbitraryBRDFSpace space(Ng);
+				return space.localToGlobal(sample);
+				// wi = LambertianSampler::sample(random, Ng);
 			}
 			return wi;
 		}
 		float pdf(const glm::vec3 &wo, const glm::vec3 &sampled_wi) const override {
+			const CoupledBRDFSampler &sampler = CoupledBRDFConductor::sampler();
+			float theta = std::acos(glm::dot(Ng, sampled_wi));
+
 			float spAlbedo = CoupledBRDFConductor::specularAlbedo().sample(alpha, glm::dot(Ng, wo));
-			float pdf_omega = 
+			float pdf_omega =
 				spAlbedo * BeckmannImportanceSampler::pdf(sampled_wi, alpha, wo, Ng)
 				+
-				(1.0f - spAlbedo) * LambertianSampler::pdf(sampled_wi, Ng);
+				(1.0f - spAlbedo) * (1.0f / glm::two_pi<float>()) * (sampler.thetaSize(alpha) * (2.0 / glm::pi<float>())) * sampler.probability(alpha, theta) / std::sin(theta);
+				// (1.0f - spAlbedo) * LambertianSampler::pdf(sampled_wi, Ng);
 			return pdf_omega;
 		}
 	};

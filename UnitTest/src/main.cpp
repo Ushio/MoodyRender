@@ -151,8 +151,14 @@ TEST_CASE("LambertianMaterial", "[LambertianMaterial]") {
 }
 
 TEST_CASE("microfacet", "[microfacet]") {
-	rt::CoupledBRDFConductor::load(ofToDataPath("baked/albedo_specular_conductor.xml").c_str(), ofToDataPath("baked/albedo_specular_conductor_avg.xml").c_str());
-	rt::CoupledBRDFDielectrics::load(ofToDataPath("baked/albedo_specular_dielectrics.xml").c_str(), ofToDataPath("baked/albedo_specular_dielectrics_avg.xml").c_str());
+	rt::CoupledBRDFConductor::load(
+		ofToDataPath("baked/albedo_specular_conductor.xml").c_str(),
+		ofToDataPath("baked/albedo_specular_conductor_avg.xml").c_str());
+	rt::CoupledBRDFDielectrics::load(
+		ofToDataPath("baked/albedo_specular_dielectrics.xml").c_str(),
+		ofToDataPath("baked/albedo_specular_dielectrics_avg.xml").c_str());
+	//rt::CoupledBRDFConductor::load(ofToDataPath("baked/albedo_specular_conductor.xml").c_str(), ofToDataPath("baked/albedo_specular_conductor_avg.xml").c_str());
+	//rt::CoupledBRDFDielectrics::load(ofToDataPath("baked/albedo_specular_dielectrics.xml").c_str(), ofToDataPath("baked/albedo_specular_dielectrics_avg.xml").c_str());
 
 	//SECTION("hemisphere_composite_simpson") {
 	//	double result = rt::hemisphere_composite_simpson<double>([](double theta, double phi) {
@@ -186,6 +192,49 @@ TEST_CASE("microfacet", "[microfacet]") {
 	//	}
 	//}
 
+	//SECTION("Importance Sampling MicrofacetCoupledConductorMaterial") {
+	//	using namespace rt;
+	//	rt::Xor64 *random = new rt::Xor64();
+	//	for (int j = 0; j < 100; ++j) {
+	//		OnlineMean<double> mean;
+	//		float alpha = random->uniformf(0.1f, 1.0f);
+	//		glm::vec3 Ng(0.0f, 0.0f, 1.0f);
+
+	//		for (int i = 0; i < 1000000; ++i) {
+	//			//float theta = CoupledBRDFConductor::sampler().sampleTheta(alpha, random);
+	//			//glm::vec3 sample = polar_to_cartesian(theta, random->uniformf(0.0f, glm::two_pi<float>()));
+	//			//ArbitraryBRDFSpace space(Ng);
+	//			//glm::vec3 wi = space.localToGlobal(sample);
+
+	//			// glm::vec3 wi = LambertianSampler::sample(random, Ng);
+
+	//			const CoupledBRDFSampler &sampler = CoupledBRDFConductor::sampler();
+	//			// float pdf = (1.0f / glm::two_pi<float>()) * (2.0 * sampler.thetaSize(alpha) / glm::pi<float>()) * sampler.probability(alpha, theta) / std::sin(theta);
+	//			// float pdf = LambertianSampler::pdf(wi, Ng);
+	//			// float value = 1.0 / glm::pi<float>() * glm::dot(wi, Ng) / pdf;
+	//			//float theta = random->uniformf(0.0f, glm::pi<float>() * 0.5f);
+	//			//// float p = 1.0 / sampler.thetaSize(alpha);
+	//			//float p = sampler.probability(alpha, theta);
+	//			//float pdf = p * sampler.thetaSize(alpha) * (2.0 / glm::pi<float>());
+	//			//float value = pdf / (2.0 / glm::pi<float>());
+
+
+	//			glm::vec3 wi = LambertianSampler::sample(random, Ng);
+	//			float theta = acos(glm::dot(wi, Ng));
+
+	//			float value = (1.0f / glm::two_pi<float>()) * (sampler.thetaSize(alpha) * (2.0 / glm::pi<float>())) * sampler.probability(alpha, theta) / std::sin(theta);
+
+	//			float sample = value / LambertianSampler::pdf(wi, Ng);
+	//			if (std::isfinite(sample) == false) {
+	//				printf("\n");
+	//			}
+	//			mean.addSample(sample);
+	//		}
+
+	//		float result = mean.mean();
+	//		printf("%f\n", result);
+	//	}
+	//}
 	SECTION("white furnance test MicrofacetCoupledConductorMaterial") {
 		using namespace rt;
 
@@ -263,9 +312,11 @@ TEST_CASE("microfacet", "[microfacet]") {
 			CAPTURE(alpha);
 			CAPTURE(glm::dot(Ng, wo));
 			REQUIRE(std::abs(result - 1.0) < 1.0e-2);
-			printf("%f\n", result);
+			// printf("%f\n", result);
 		}
 	}
+
+
 }
 
 

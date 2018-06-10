@@ -421,6 +421,15 @@ void ofApp::update() {
 	if (ofGetFrameNum() % 5 == 0) {
 		_image.setFromPixels(toOf(renderer->_image));
 	}
+
+	if (renderer->stepCount() == 512) {
+		_image.setFromPixels(toOf(renderer->_image));
+		_image.save("512spp.png");
+	}
+	if (renderer->stepCount() == 1024) {
+		_image.setFromPixels(toOf(renderer->_image));
+		_image.save("1024spp.png");
+	}
 }
 
 //--------------------------------------------------------------

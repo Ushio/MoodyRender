@@ -1,8 +1,13 @@
 ﻿#include "ofApp.h"
 #include "peseudo_random.hpp"
 #include "microfacet.hpp"
+#include "material.hpp"
+
 //--------------------------------------------------------------
 void ofApp::setup(){
+	rt::CoupledBRDFConductor::load(ofToDataPath("baked/albedo_specular_conductor.xml").c_str(), ofToDataPath("baked/albedo_specular_conductor_avg.xml").c_str());
+	rt::CoupledBRDFDielectrics::load(ofToDataPath("baked/albedo_specular_dielectrics.xml").c_str(), ofToDataPath("baked/albedo_specular_dielectrics_avg.xml").c_str());
+
 	_camera.setNearClip(0.1f);
 	_camera.setFarClip(100.0f);
 	_camera.setDistance(5.0f);
@@ -32,7 +37,7 @@ void ofApp::draw(){
 	using namespace rt;
 
 	Xor64 random;
-	float alpha = 0.9f;
+	float alpha = 0.3f;
 	float cosTheta = ofMap(ofGetMouseX(), 0, ofGetWidth(), 0, 1);
 	glm::vec3 wo = glm::vec3(std::sqrt(1.0f - cosTheta * cosTheta), 0.0f, cosTheta);
 	glm::vec3 Ng(0.0f, 0.0f, 1.0f);
@@ -43,32 +48,38 @@ void ofApp::draw(){
 	ofMesh mesh;
 	mesh.setMode(OF_PRIMITIVE_POINTS);
 	for (int i = 0; i < 3000; ++i) {
-		glm::vec3 wi = BeckmannImportanceSampler::sample(&random, alpha, wo, Ng);
+		float theta = CoupledBRDFConductor::sampler().sampleTheta(alpha, &random);
+		// float theta = random.uniformf(0.0f, glm::pi<float>() * 0.5f);
+		glm::vec3 sample = polar_to_cartesian(theta, random.uniformf(0.0f, glm::two_pi<float>()));
+		ArbitraryBRDFSpace space(Ng);
+		glm::vec3 wi = space.localToGlobal(sample);
+
+		// glm::vec3 wi = BeckmannImportanceSampler::sample(&random, alpha, wo, Ng);
 		mesh.addVertex(glm::vec3(wi.x, wi.z, wi.y));
 	}
 	ofSetColor(255);
 	mesh.draw();
 
-	// 裏側の数値がとても不安定..
-	ofPolyline line;
-	int N = 3000;
-	for (int i = 0; i < N; ++i) {
-		float theta = ofMap(i, 0, N - 1, 0, glm::two_pi<float>());
-		float cosTheta = cos(theta);
-		float sinTheta = sin(theta);
-		glm::vec3 wi = glm::vec3(sinTheta, 0.0f, cosTheta);
+	//// 裏側の数値がとても不安定..
+	//ofPolyline line;
+	//int N = 3000;
+	//for (int i = 0; i < N; ++i) {
+	//	float theta = ofMap(i, 0, N - 1, 0, glm::two_pi<float>());
+	//	float cosTheta = cos(theta);
+	//	float sinTheta = sin(theta);
+	//	glm::vec3 wi = glm::vec3(sinTheta, 0.0f, cosTheta);
 
-		double p = BeckmannImportanceSampler::pdf(wi, alpha, wo, Ng);
-		if (p < 0) {
-			printf("w");
-		}
-		BeckmannImportanceSampler::pdf(wi, alpha, wo, Ng);
+	//	double p = BeckmannImportanceSampler::pdf(wi, alpha, wo, Ng);
+	//	if (p < 0) {
+	//		printf("w");
+	//	}
+	//	BeckmannImportanceSampler::pdf(wi, alpha, wo, Ng);
 
-		line.addVertex(glm::vec3(wi.x, wi.z, wi.y) * p);
-	}
-	line.draw();
+	//	line.addVertex(glm::vec3(wi.x, wi.z, wi.y) * p);
+	//}
+	//line.draw();
 
-	_camera.end();
+	//_camera.end();
 
 	ofDisableDepthTest();
 	ofSetColor(255);
