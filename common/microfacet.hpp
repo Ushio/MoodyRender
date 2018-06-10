@@ -5,6 +5,7 @@
 #include "coordinate.hpp"
 #include "composite_simpson.hpp"
 #include "serializable_buffer.hpp"
+#include "value_prportional_sampler.hpp"
 
 namespace rt {
 	inline float chi_plus(float x) {
@@ -117,41 +118,6 @@ namespace rt {
 	}
 
 
-
-	class ValueProportionalSampler {
-	public:
-		ValueProportionalSampler() {}
-		ValueProportionalSampler(const std::vector<double> &values) {
-			double sumValue = 0.0;
-			for (int i = 0; i < values.size(); ++i) {
-				sumValue += values[i];
-				_cumulativeAreas.push_back(sumValue);
-			}
-			_sumValue = sumValue;
-			_values = values;
-		}
-		int sample(PeseudoRandom *random) const {
-			double area_at = random->uniform(0.0, _sumValue);
-			auto it = std::upper_bound(_cumulativeAreas.begin(), _cumulativeAreas.end(), area_at);
-			std::size_t index = std::distance(_cumulativeAreas.begin(), it);
-			index = std::min(index, _cumulativeAreas.size() - 1);
-			return (int)index;
-		}
-		double sumValue() const {
-			return _sumValue;
-		}
-		double probability(int index) const {
-			return _values[index] / _sumValue;
-		}
-		int size() const {
-			return _values.size();
-		}
-	private:
-		double _sumValue = 0.0;
-		std::vector<double> _values;
-		std::vector<double> _cumulativeAreas;
-	};
-
 	inline double CoupledBRDF_I(double theta, double alpha, std::function<double(double, double)> specularAlbedo) {
 		return rt::composite_simpson<double>([&](double xi) {
 			double cosTheta = std::cos(xi);
@@ -170,29 +136,29 @@ namespace rt {
 			for (int i = 0; i < kAlphaCount; ++i) {
 				float alpha = indexToAlpha(i, kAlphaCount);
 
-				std::vector<double> values(kSampleBlockCount);
+				std::vector<float> values(kSampleBlockCount);
 				for (int j = 0; j < kSampleBlockCount; ++j) {
 					values[j] = CoupledBRDF_I(indexToTheta(j, kSampleBlockCount), alpha, specularAlbedo);
 				}
-				_discreteSamplers[i] = ValueProportionalSampler(values);
+				_discreteSamplers[i] = ValueProportionalSampler<float>(values);
 			}
 		}
 		float sampleTheta(float alpha, PeseudoRandom *random) const {
 			int alphaIndex = alphaToIndex(alpha, _discreteSamplers.size());
-			const ValueProportionalSampler &sampler = _discreteSamplers[alphaIndex];
+			const ValueProportionalSampler<float> &sampler = _discreteSamplers[alphaIndex];
 			int indexTheta = sampler.sample(random);
 			auto thetaRange = indexToThetaRange(indexTheta, sampler.size());
 			return random->uniformf(thetaRange.first, thetaRange.second);
 		}
 		float probability(float alpha, float theta) const {
 			int alphaIndex = alphaToIndex(alpha, _discreteSamplers.size());
-			const ValueProportionalSampler &sampler = _discreteSamplers[alphaIndex];
+			const ValueProportionalSampler<float> &sampler = _discreteSamplers[alphaIndex];
 			int thetaIndex = thetaToIndex(theta, sampler.size());
 			return sampler.probability(thetaIndex);
 		}
 		int thetaSize(float alpha) const {
 			int alphaIndex = alphaToIndex(alpha, _discreteSamplers.size());
-			const ValueProportionalSampler &sampler = _discreteSamplers[alphaIndex];
+			const ValueProportionalSampler<float> &sampler = _discreteSamplers[alphaIndex];
 			return sampler.size();
 		}
 	private:
@@ -229,7 +195,7 @@ namespace rt {
 		}
 
 		// alpha => table
-		std::vector<ValueProportionalSampler> _discreteSamplers;
+		std::vector<ValueProportionalSampler<float>> _discreteSamplers;
 	};
 
 	class CoupledBRDFConductor {

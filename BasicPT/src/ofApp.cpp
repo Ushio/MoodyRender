@@ -3,6 +3,8 @@
 #include "microfacet.hpp"
 #include "bicubic.hpp"
 #include "material.hpp"
+#include "value_prportional_sampler.hpp"
+#include "geometry.hpp"
 
 #include <xmmintrin.h>
 #include <pmmintrin.h>
@@ -106,6 +108,16 @@ namespace rt {
 		mutable RTCIntersectContext _context;
 
 		std::unordered_map<unsigned int, int> _geomIDToIndex;
+
+		//struct EmissivePrimitiveRef {
+		//	int geometeryIndex;
+		//	int primitiveIndex;
+		//	double area;
+		//};
+		//std::vector<EmissivePrimitiveRef> _emissivePrimitives;
+		//void sample() {
+		//	auto v = ValueProportionalSampler<double>(_emissivePrimitives, [](const EmissivePrimitiveRef &ref) { return (double)ref.area; });
+		//}
 	};
 
 	class Image {
@@ -147,6 +159,10 @@ namespace rt {
 		int _h = 0;
 		std::vector<Pixel> _pixels;
 	};
+
+	inline float GTerm(const glm::vec3 &p, const glm::vec3 &pNg, const glm::vec3 &q, const glm::vec3 &qNg) {
+		return glm::dot(p, pNg) * glm::dot(q, qNg) / glm::distance2(p, q);
+	}
 
 	inline glm::vec3 radiance(const rt::SceneInterface &scene, glm::vec3 ro, glm::vec3 rd, PeseudoRandom *random) {
 		glm::vec3 Lo;
