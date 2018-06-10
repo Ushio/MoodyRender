@@ -471,6 +471,7 @@ namespace rt {
 			const char *SpecularMaterialString = "SpecularMaterial";
 			const char *MicrofacetConductorMaterialString = "MicrofacetConductorMaterial";
 			const char *MicrofacetCoupledConductorMaterialString = "MicrofacetCoupledConductorMaterial";
+			const char *MicrofacetCoupledDielectricsMaterialString = "MicrofacetCoupledDielectricsMaterial";
 
 			auto material = abcGeom.primitiveAttributes.find("Material");
 			if (material != abcGeom.primitiveAttributes.end()) {
@@ -509,6 +510,22 @@ namespace rt {
 								const std::vector<AttributeVariant> &roughnesses = abcGeom.primitiveAttributes["roughness"];
 								if (auto roughness = strict_variant::get<float>(&roughnesses[primID])) {
 									m.alpha = (*roughness) * (*roughness);
+								}
+							}
+							geom.primitives[primID].material = m;
+						}
+						else if (*materialString == MicrofacetCoupledDielectricsMaterialString) {
+							MicrofacetCoupledDielectricsMaterial m;
+							if (abcGeom.primitiveAttributes.count("roughness")) {
+								const std::vector<AttributeVariant> &roughnesses = abcGeom.primitiveAttributes["roughness"];
+								if (auto roughness = strict_variant::get<float>(&roughnesses[primID])) {
+									m.alpha = (*roughness) * (*roughness);
+								}
+							}
+							if (abcGeom.primitiveAttributes.count("Cd")) {
+								const std::vector<AttributeVariant> &Cd = abcGeom.primitiveAttributes["Cd"];
+								if (auto CdVec3 = strict_variant::get<glm::vec3>(&Cd[primID])) {
+									m.Cd = *CdVec3;
 								}
 							}
 							geom.primitives[primID].material = m;

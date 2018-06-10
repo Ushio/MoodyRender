@@ -208,27 +208,6 @@ namespace rt {
 
 			return brdf_spec + brdf_diff;
 		}
-		//glm::vec3 sample(PeseudoRandom *random, const glm::vec3 &wo) const override {
-		//	// ミックス 重点サンプリング
-		//	glm::vec3 wi;
-		//	float spAlbedo = CoupledBRDFConductor::specularAlbedo().sample(alpha, glm::dot(Ng, wo));
-
-		//	if (random->uniformf() < spAlbedo) {
-		//		wi = BeckmannImportanceSampler::sample(random, alpha, wo, Ng);
-		//	}
-		//	else {
-		//		wi = LambertianSampler::sample(random, Ng);
-		//	}
-		//	return wi;
-		//}
-		//float pdf(const glm::vec3 &wo, const glm::vec3 &sampled_wi) const override {
-		//	float spAlbedo = CoupledBRDFConductor::specularAlbedo().sample(alpha, glm::dot(Ng, wo));
-		//	float pdf_omega = 
-		//		spAlbedo * BeckmannImportanceSampler::pdf(sampled_wi, alpha, wo, Ng)
-		//		+
-		//		(1.0f - spAlbedo) * LambertianSampler::pdf(sampled_wi, Ng);
-		//	return pdf_omega;
-		//}
 
 		glm::vec3 sample(PeseudoRandom *random, const glm::vec3 &wo) const override {
 			glm::vec3 wi;
@@ -259,8 +238,76 @@ namespace rt {
 			return pdf_omega;
 		}
 	};
+	
+	class MicrofacetCoupledDielectricsMaterial : public IMaterial {
+	public:
+		float alpha = 0.2f;
+		glm::vec3 Cd = glm::vec3(1.0);
 
-	typedef strict_variant::variant<LambertianMaterial, SpecularMaterial, MicrofacetConductorMaterial, MicrofacetCoupledConductorMaterial> Material;
+		glm::vec3 bxdf(const glm::vec3 &wo, const glm::vec3 &wi) const override {
+			float cos_term_wo = glm::dot(Ng, wo);
+			float cos_term_wi = glm::dot(Ng, wi);
+
+			// chi_plus(glm::dot(Ng, omega_i)) * chi_plus(glm::dot(Ng, omega_o))
+			if (cos_term_wo <= 0.0f || cos_term_wi <= 0.0f) {
+				return glm::vec3();
+			}
+
+			glm::vec3 h = glm::normalize(wi + wo);
+			float d = D_Beckmann(Ng, h, alpha);
+			float g = G2_height_correlated_beckmann(wi, wo, h, Ng, alpha);
+
+			float brdf_without_f = d * g / (4.0f * cos_term_wo * cos_term_wi);
+
+			glm::vec3 brdf_spec = glm::vec3(brdf_without_f);
+
+			{
+				float cosThetaFresnel = glm::dot(h, wo);
+				glm::vec3 f = glm::vec3(fresnel_dielectrics(cosThetaFresnel));
+				brdf_spec = f * brdf_without_f;
+			}
+
+			glm::vec3 kLambda = Cd;
+
+			glm::vec3 brdf_diff = kLambda
+				* (1.0f - CoupledBRDFDielectrics::specularAlbedo().sample(alpha, cos_term_wo))
+				* (1.0f - CoupledBRDFDielectrics::specularAlbedo().sample(alpha, cos_term_wi))
+				/ (glm::pi<float>() * (1.0f - CoupledBRDFDielectrics::specularAvgAlbedo().sample(alpha)));
+
+			return brdf_spec + brdf_diff;
+		}
+
+		glm::vec3 sample(PeseudoRandom *random, const glm::vec3 &wo) const override {
+			glm::vec3 wi;
+			float spAlbedo = CoupledBRDFDielectrics::specularAlbedo().sample(alpha, glm::dot(Ng, wo));
+
+			if (random->uniformf() < spAlbedo) {
+				wi = BeckmannImportanceSampler::sample(random, alpha, wo, Ng);
+			}
+			else {
+				float theta = CoupledBRDFDielectrics::sampler().sampleTheta(alpha, random);
+				glm::vec3 sample = polar_to_cartesian(theta, random->uniformf(0.0f, glm::two_pi<float>()));
+				ArbitraryBRDFSpace space(Ng);
+				return space.localToGlobal(sample);
+				// wi = LambertianSampler::sample(random, Ng);
+			}
+			return wi;
+		}
+		float pdf(const glm::vec3 &wo, const glm::vec3 &sampled_wi) const override {
+			const CoupledBRDFSampler &sampler = CoupledBRDFDielectrics::sampler();
+			float theta = std::acos(glm::dot(Ng, sampled_wi));
+
+			float spAlbedo = CoupledBRDFDielectrics::specularAlbedo().sample(alpha, glm::dot(Ng, wo));
+			float pdf_omega =
+				spAlbedo * BeckmannImportanceSampler::pdf(sampled_wi, alpha, wo, Ng)
+				+
+				(1.0f - spAlbedo) * (1.0f / glm::two_pi<float>()) * (sampler.thetaSize(alpha) * (2.0 / glm::pi<float>())) * sampler.probability(alpha, theta) / std::sin(theta);
+			// (1.0f - spAlbedo) * LambertianSampler::pdf(sampled_wi, Ng);
+			return pdf_omega;
+		}
+	};
+
+	typedef strict_variant::variant<LambertianMaterial, SpecularMaterial, MicrofacetConductorMaterial, MicrofacetCoupledConductorMaterial, MicrofacetCoupledDielectricsMaterial> Material;
 
 	namespace MaterialVisitor {
 		struct SetNg {
