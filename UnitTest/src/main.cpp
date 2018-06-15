@@ -133,8 +133,8 @@ TEST_CASE("LambertianMaterial", "[LambertianMaterial]") {
 			double result = hemisphere_composite_simpson<double>([&](double theta, double phi) {
 				glm::vec3 wi = rt::polar_to_cartesian((float)theta, (float)phi);
 
-				glm::vec3 brdf = bxdf_evaluate(m, wo, wi);
-				float cosTheta = glm::dot(bxdf_Ng(m), wi);
+				glm::vec3 brdf = m.bxdf(wo, wi);
+				float cosTheta = glm::dot(m.Ng, wi);
 
 				REQUIRE(std::abs(brdf.x - brdf.y) < 1.0e-6);
 				REQUIRE(std::abs(brdf.y - brdf.z) < 1.0e-6);
@@ -209,8 +209,8 @@ TEST_CASE("microfacet", "[microfacet]") {
 			double result = hemisphere_composite_simpson<double>([&](double theta, double phi) {
 				glm::vec3 wi = rt::polar_to_cartesian((float)theta, (float)phi);
 
-				glm::vec3 brdf = bxdf_evaluate(m, wo, wi);
-				float cosTheta = glm::dot(bxdf_Ng(m), wi);
+				glm::vec3 brdf = m.bxdf(wo, wi);
+				float cosTheta = glm::dot(m.Ng, wi);
 
 				REQUIRE(std::abs(brdf.x - brdf.y) < 1.0e-6);
 				REQUIRE(std::abs(brdf.y - brdf.z) < 1.0e-6);
@@ -243,8 +243,8 @@ TEST_CASE("microfacet", "[microfacet]") {
 			double result = hemisphere_composite_simpson<double>([&](double theta, double phi) {
 				glm::vec3 wi = rt::polar_to_cartesian((float)theta, (float)phi);
 
-				glm::vec3 brdf = bxdf_evaluate(m, wo, wi);
-				float cosTheta = glm::dot(bxdf_Ng(m), wi);
+				glm::vec3 brdf = m.bxdf(wo, wi);
+				float cosTheta = glm::dot(m.Ng, wi);
 
 				REQUIRE(std::abs(brdf.x - brdf.y) < 1.0e-6);
 				REQUIRE(std::abs(brdf.y - brdf.z) < 1.0e-6);
@@ -279,10 +279,10 @@ TEST_CASE("microfacet", "[microfacet]") {
 			OnlineMean<double> mean;
 
 			for (int i = 0; i < 500000; ++i) {
-				glm::vec3 wi = bxdf_sample(m, random, wo);
-				glm::vec3 bxdf = bxdf_evaluate(m, wo, wi);
-				float pdf = bxdf_pdf(m, wo, wi);
-				float cosTheta = glm::dot(bxdf_Ng(m), wi);
+				glm::vec3 wi = m.sample(random, wo);
+				glm::vec3 bxdf = m.bxdf(wo, wi);
+				float pdf = m.pdf(wo, wi);
+				float cosTheta = glm::dot(m.Ng, wi);
 
 				REQUIRE(std::abs(bxdf.x - bxdf.y) < 1.0e-6);
 				REQUIRE(std::abs(bxdf.y - bxdf.z) < 1.0e-6);
@@ -324,10 +324,10 @@ TEST_CASE("microfacet", "[microfacet]") {
 			OnlineMean<double> mean;
 
 			for (int i = 0; i < 500000; ++i) {
-				glm::vec3 wi = bxdf_sample(m, random, wo);
-				glm::vec3 bxdf = bxdf_evaluate(m, wo, wi);
-				float pdf = bxdf_pdf(m, wo, wi);
-				float cosTheta = glm::dot(bxdf_Ng(m), wi);
+				glm::vec3 wi = m.sample(random, wo);
+				glm::vec3 bxdf = m.bxdf(wo, wi);
+				float pdf = m.pdf(wo, wi);
+				float cosTheta = glm::dot(m.Ng, wi);
 
 				REQUIRE(std::abs(bxdf.x - bxdf.y) < 1.0e-6);
 				REQUIRE(std::abs(bxdf.y - bxdf.z) < 1.0e-6);

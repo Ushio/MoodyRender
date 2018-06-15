@@ -62,7 +62,7 @@ namespace rt {
 			for (int i = 0; i < _scene->geometries.size(); ++i) {
 				const Geometry& g = _scene->geometries[i];
 				for (int j = 0; j < g.primitives.size(); ++j) {
-					if (bxdf_is_emissive(g.primitives[j].material)) {
+					if (g.primitives[j].material->isEmission()) {
 						EmissivePrimitiveRef ref;
 						ref.geometeryIndex = i;
 						ref.primitiveIndex = j;
@@ -141,7 +141,7 @@ namespace rt {
 			*material = prim.material;
 			glm::vec3 unnormalized(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z);
 
-			bxdf_SetNg(*material, glm::normalize(unnormalized));
+			(*material)->Ng = glm::normalize(unnormalized);
 
 			return true;
 		}
@@ -157,9 +157,9 @@ namespace rt {
 			auto material = g.primitives[prim.primitiveIndex].material;
 			auto indices = g.primitives[prim.primitiveIndex].indices;
 
-			bxdf_SetNg(material, prim.Ng);
-*m = material;
-*p = uniform_on_triangle(random->uniformf(), random->uniformf()).evaluate(g.points[indices.x].P, g.points[indices.y].P, g.points[indices.z].P);
+			material->Ng = prim.Ng;
+			*m = material;
+			*p = uniform_on_triangle(random->uniformf(), random->uniformf()).evaluate(g.points[indices.x].P, g.points[indices.y].P, g.points[indices.z].P);
 		}
 		float emissiveArea() const {
 			return _emissionSampler.sumValue();
@@ -264,12 +264,11 @@ namespace rt {
 				//		}
 				//	}
 				//}
-
-				glm::vec3 wi = bxdf_sample(m, random, wo);
-				glm::vec3 bxdf = bxdf_evaluate(m, wo, wi);
-				glm::vec3 emission = bxdf_emission(m, wo);
-				float pdf = bxdf_pdf(m, wo, wi);
-				float cosTheta = std::abs(glm::dot(bxdf_Ng(m), wi));
+				glm::vec3 wi = m->sample(random, wo);
+				glm::vec3 bxdf = m->bxdf(wo, wi);
+				glm::vec3 emission = m->emission(wo);
+				float pdf = m->pdf(wo, wi);
+				float cosTheta = std::abs(glm::dot(m->Ng, wi));
 
 				//if (i == 0) {
 				//	Lo += emission * T;
@@ -524,7 +523,7 @@ void ofApp::draw() {
 			auto p = o + d * tmin;
 			ofDrawLine(o.x, o.y, o.z, p.x, p.y, p.z);
 			
-			auto pn = p + strict_variant::apply_visitor(rt::MaterialVisitor::GetNg(), m) * 0.1f;
+			auto pn = p + m->Ng * 0.1f;
 			ofDrawLine(p.x, p.y, p.z, pn.x, pn.y, pn.z);
 		} else {
 			ofSetColor(255);

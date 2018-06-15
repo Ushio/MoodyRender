@@ -314,48 +314,27 @@ namespace rt {
 		}
 	};
 
-	typedef strict_variant::variant<LambertianMaterial, SpecularMaterial, MicrofacetConductorMaterial, MicrofacetCoupledConductorMaterial, MicrofacetCoupledDielectricsMaterial> Material;
+	class Material {
+	public:
+		typedef strict_variant::variant<
+			LambertianMaterial,
+			SpecularMaterial,
+			MicrofacetConductorMaterial,
+			MicrofacetCoupledConductorMaterial,
+			MicrofacetCoupledDielectricsMaterial
+		> MaterialType;
 
-	namespace MaterialVisitor {
-		struct SetNg {
-			SetNg(const glm::vec3 &Ng) : _Ng(Ng) {}
-			template <class T>
-			void operator()(T &m) {
-				m.Ng = _Ng;
-			}
-			glm::vec3 _Ng;
-		};
-		struct GetNg {
-			template <class T>
-			glm::vec3 operator()(const T &m) const {
-				return m.Ng;
-			}
-		};
-	}
-	inline bool bxdf_is_emissive(const Material &m) {
-		return strict_variant::apply_visitor([](const IMaterial &m) { return m.isEmission(); }, m);
-	}
-	inline glm::vec3 bxdf_Ng(const Material &m) {
-		return strict_variant::apply_visitor(MaterialVisitor::GetNg(), m);
-	}
-	inline void bxdf_SetNg(Material &m, const glm::vec3 &Ng) {
-		strict_variant::apply_visitor(MaterialVisitor::SetNg(Ng), m);
-	}
+		Material() {}
+		Material(const MaterialType &m) :_material(m) { }
+		Material &operator=(const MaterialType &m) { _material = m; return *this; }
 
-	inline glm::vec3 bxdf_emission(const Material &m, const glm::vec3 &wo) {
-		auto f = [](const IMaterial &m, const glm::vec3 &wo) { return m.emission(wo); };
-		return strict_variant::apply_visitor(std::bind(f, std::placeholders::_1, wo), m);
-	}
-	inline glm::vec3 bxdf_evaluate(const Material &m, const glm::vec3 &wo, const glm::vec3 &wi) {
-		auto f = [](const IMaterial &m, const glm::vec3 &wo, const glm::vec3 &wi) { return m.bxdf(wo, wi); };
-		return strict_variant::apply_visitor(std::bind(f, std::placeholders::_1, wo, wi), m);
-	}
-	inline glm::vec3 bxdf_sample(const Material &m, PeseudoRandom *random, const glm::vec3 &wo) {
-		auto f = [](const IMaterial &m, PeseudoRandom *random, const glm::vec3 &wo) { return m.sample(random, wo); };
-		return strict_variant::apply_visitor(std::bind(f, std::placeholders::_1, random, wo), m);
-	}
-	inline float bxdf_pdf(const Material &m, const glm::vec3 &wo, const glm::vec3 &sampled_wi) {
-		auto f = [](const IMaterial &m, const glm::vec3 &wo, const glm::vec3 &sampled_wi) { return m.pdf(wo, sampled_wi); };
-		return strict_variant::apply_visitor(std::bind(f, std::placeholders::_1, wo, sampled_wi), m);
-	}
+		IMaterial *operator->() {
+			return strict_variant::apply_visitor([](IMaterial &m) { return &m; }, _material);
+		}
+		const IMaterial *operator->() const {
+			return strict_variant::apply_visitor([](const IMaterial &m) { return &m; }, _material);
+		}
+	private:
+		MaterialType _material;
+	};
 }
