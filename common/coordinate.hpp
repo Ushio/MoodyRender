@@ -15,22 +15,29 @@ namespace rt {
 		return v;
 	};
 
-	// zが上の座標系に移動する行列
-	inline glm::mat3 to_bxdf_basis_transform(const glm::dvec3 &n) {
-		glm::dvec3 xaxis;
-		glm::dvec3 zaxis = n;
-		glm::dvec3 yaxis;
-		if (0.999 < glm::abs(zaxis.z)) {
-			xaxis = glm::normalize(glm::cross(glm::dvec3(0.0, 1.0, 0.0), zaxis));
-		}
-		else {
-			xaxis = glm::normalize(glm::cross(glm::dvec3(0.0, 0.0, 1.0), zaxis));
-		}
-		yaxis = glm::cross(zaxis, xaxis);
-		return glm::transpose(glm::mat3(xaxis, yaxis, zaxis));
-	}
-	inline glm::dvec3 from_bxdf(const glm::dvec3 &n, const glm::dvec3 &bxdf_dir) {
-		return glm::transpose(to_bxdf_basis_transform(n)) * bxdf_dir;
+	// Building an Orthonormal Basis, Revisited
+	template <typename Real, glm::precision P>
+	inline void orthonormalBasis(const glm::tvec3<Real, P>& zaxis, glm::tvec3<Real, P> *xaxis, glm::tvec3<Real, P> *yaxis) {
+		const Real sign = copysignf(Real(1.0), zaxis.z);
+		const Real a = Real(-1.0) / (sign + zaxis.z);
+		const Real b = zaxis.x * zaxis.y * a;
+		*xaxis = glm::tvec3<Real, P>(Real(1.0) + sign * zaxis.x * zaxis.x * a, sign * b, -sign * zaxis.x);
+		*yaxis = glm::tvec3<Real, P>(b, sign + zaxis.y * zaxis.y * a, -zaxis.y);
 	}
 
+	// z が上, 任意の x, y
+	// 一般的な極座標系とも捉えられる
+	struct ArbitraryBRDFSpace {
+		ArbitraryBRDFSpace(const glm::dvec3 &zAxis) : zaxis(zAxis) {
+			orthonormalBasis(zAxis, &xaxis, &yaxis);
+		}
+		glm::dvec3 localToGlobal(const glm::dvec3 v) const {
+			return v.x * xaxis + v.y * yaxis + v.z * zaxis;
+		}
+
+		// axis on global space
+		glm::dvec3 xaxis;
+		glm::dvec3 yaxis;
+		glm::dvec3 zaxis;
+	};
 }

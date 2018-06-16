@@ -67,8 +67,9 @@ namespace rt {
 			double phi = random->uniform(0.0, glm::two_pi<double>());
 			glm::dvec3 sample = polar_to_cartesian(theta, phi);
 
-			glm::dvec3 harf = from_bxdf(Ng, sample);
-			glm::dvec3 wi = glm::reflect(-wo, harf);
+			ArbitraryBRDFSpace basis(Ng);
+			glm::dvec3 h = basis.localToGlobal(sample);
+			glm::dvec3 wi = glm::reflect(-wo, h);
 			return wi;
 		}
 

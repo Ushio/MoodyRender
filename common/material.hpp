@@ -7,31 +7,9 @@
 #include <strict_variant/variant.hpp>
 #include "peseudo_random.hpp"
 #include "microfacet.hpp"
+#include "coordinate.hpp"
 
 namespace rt {
-	// z が上, 任意の x, y
-	// 一般的な極座標系とも捉えられる
-	struct ArbitraryBRDFSpace {
-		ArbitraryBRDFSpace(const glm::dvec3 &zAxis) {
-			zaxis = zAxis;
-			if (0.999 < glm::abs(zaxis.z)) {
-				xaxis = glm::normalize(glm::cross(glm::dvec3(0.0, 1.0, 0.0), zaxis));
-			}
-			else {
-				xaxis = glm::normalize(glm::cross(glm::dvec3(0.0, 0.0, 1.0), zaxis));
-			}
-			yaxis = glm::cross(zaxis, xaxis);
-		}
-		glm::dvec3 localToGlobal(const glm::dvec3 v) const {
-			return v.x * xaxis + v.y * yaxis + v.z * zaxis;
-		}
-
-		// axis on global space
-		glm::dvec3 xaxis;
-		glm::dvec3 yaxis;
-		glm::dvec3 zaxis;
-	};
-
 	class LambertianSampler {
 	public:
 		static glm::dvec3 sample(PeseudoRandom *random, const glm::dvec3 &Ng) {
