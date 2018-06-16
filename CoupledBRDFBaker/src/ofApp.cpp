@@ -54,7 +54,7 @@ inline void bake(std::string name, bool include_fresnel_dielectrics) {
 		}
 		return mean.mean();
 	});
-	albedo.save(ofToDataPath(name + ".xml").c_str());
+	albedo.saveXML(ofToDataPath(name + ".xml").c_str());
 
 	// preview
 	ofFloatImage image;
@@ -84,35 +84,6 @@ void bake_avg(const char *albedoFile, const char *dstName) {
 	avg.save(ofToDataPath(dstName).c_str());
 }
 
-// specularAlbedo(alpha, cosTheta)
-inline double I(double theta, double alpha, std::function<double(double, double)> specularAlbedo) {
-	return rt::composite_simpson<double>([&](double xi) {
-		double cosTheta = std::cos(xi);
-		return (1.0 - specularAlbedo(alpha, cosTheta)) * cosTheta;
-	}, 128, 0.0, theta);
-}
-
-inline double I_Dot(double theta, double alpha, std::function<double(double, double)> specularAlbedo) {
-	return I(theta, alpha, specularAlbedo) / I(glm::pi<double>() * 0.5, alpha, specularAlbedo);
-}
-
-inline double I_Dot_Inverse(double alpha, double u, std::function<double(double, double)> specularAlbedo) {
-	double a = 0.0;
-	double b = glm::pi<double>() * 0.5;
-
-	double c = (a + b) * 0.5;
-	while(1.0e-5 < std::abs(a - b)) {
-		double value = I_Dot(c, alpha, specularAlbedo);
-		if (value < u) {
-			a = c;
-		}
-		else {
-			b = c;
-		}
-		c = (a + b) * 0.5;
-	}
-	return c;
-}
 
 //--------------------------------------------------------------
 void ofApp::setup() {
@@ -121,8 +92,8 @@ void ofApp::setup() {
 	 //bake("albedo_specular_dielectrics", true);
 	 //printf("done %f seconds\n", sw.elapsed());
 
-	 bake_avg("albedo_specular_conductor.xml", "albedo_specular_conductor_avg.xml");
-	 bake_avg("albedo_specular_dielectrics.xml", "albedo_specular_dielectrics_avg.xml");
+	 //bake_avg("albedo_specular_conductor.xml", "albedo_specular_conductor_avg.xml");
+	 //bake_avg("albedo_specular_dielectrics.xml", "albedo_specular_dielectrics_avg.xml");
 
 	ofSetVerticalSync(false);
 

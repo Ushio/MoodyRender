@@ -7,6 +7,7 @@
 #include <cereal/cereal.hpp>
 #include <cereal/types/vector.hpp>
 #include <cereal/archives/xml.hpp>
+#include <cereal/archives/portable_binary.hpp>
 
 #include <tbb/tbb.h>
 
@@ -17,10 +18,17 @@ namespace rt {
 	public:
 		SpecularAlbedo() {}
 
-		void save(const char *filename) {
+		void saveXML(const char *filename) const {
 			std::ofstream ofs(filename);
 			{
 				cereal::XMLOutputArchive o_archive(ofs);
+				o_archive(*this);
+			}
+		}
+		void saveBinary(const char *filename) const {
+			std::ofstream ofs(filename, std::ios::binary);
+			{
+				cereal::PortableBinaryOutputArchive o_archive(ofs);
 				o_archive(*this);
 			}
 		}
@@ -28,6 +36,13 @@ namespace rt {
 			std::ifstream ifs(filename);
 			{
 				cereal::XMLInputArchive i_archive(ifs);
+				i_archive(*this);
+			}
+		}
+		void loadBinary(const char *filename) {
+			std::ifstream ifs(filename);
+			{
+				cereal::PortableBinaryInputArchive i_archive(ifs);
 				i_archive(*this);
 			}
 		}
