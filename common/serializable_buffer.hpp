@@ -33,7 +33,7 @@ namespace rt {
 		}
 
 		// evaluate(alpha, cosTheta)
-		void build(int alphaSize, int cosThetaSize, std::function<float(float, float)> evaluate) {
+		void build(int alphaSize, int cosThetaSize, std::function<double(double, double)> evaluate) {
 			_alphaSize = alphaSize;
 			_cosThetaSize = cosThetaSize;
 			_values.resize(_alphaSize * _cosThetaSize);
@@ -41,10 +41,10 @@ namespace rt {
 			tbb::parallel_for(tbb::blocked_range<int>(0, _cosThetaSize), [&](const tbb::blocked_range<int> &range) {
 				for (int j = range.begin(); j < range.end(); ++j) {
 					// cosTheta == 0 を回避するために j == 0 を回避する
-					float cosTheta = (float)std::max(j, 1) / (_cosThetaSize - 1);
+					double cosTheta = (double)std::max(j, 1) / (_cosThetaSize - 1);
 					for (int i = 0; i < _alphaSize; ++i) {
 						// alpha == 0 を回避するために i == 0 を回避する
-						float alpha = (float)std::max(i, 1) / (_alphaSize - 1);
+						double alpha = (double)std::max(i, 1) / (_alphaSize - 1);
 						set(i, j, evaluate(alpha, cosTheta));
 					}
 
@@ -52,15 +52,15 @@ namespace rt {
 				}
 			});
 		}
-		float sample(float alpha, float cosTheta) const {
+		double sample(double alpha, double cosTheta) const {
 			return bicubic_2d(alpha, cosTheta, _alphaSize, _cosThetaSize, [&](int x, int y) {
 				return get(x, y);
 			});
 		}
-		void set(int x, int y, float value) {
+		void set(int x, int y, double value) {
 			_values[y * _alphaSize + x] = value;
 		}
-		float get(int x, int y) const {
+		double get(int x, int y) const {
 			return _values[y * _alphaSize + x];
 		}
 		int alphaSize() const {
@@ -80,7 +80,7 @@ namespace rt {
 
 		int _alphaSize = 0;
 		int _cosThetaSize = 0;
-		std::vector<float> _values;
+		std::vector<double> _values;
 	};
 
 	class SpecularAvgAlbedo {
@@ -103,26 +103,26 @@ namespace rt {
 		}
 
 		// evaluate(alpha)
-		void build(int alphaSize, std::function<float(float)> evaluate) {
+		void build(int alphaSize, std::function<double(double)> evaluate) {
 			_alphaSize = alphaSize;
 			_values.resize(_alphaSize);
 
 			for (int i = 0; i < _alphaSize; ++i) {
 				// alpha == 0 を回避するために i == 0 を回避する
-				float alpha = (float)std::max(i, 1) / (_alphaSize - 1);
+				double alpha = (double)std::max(i, 1) / (_alphaSize - 1);
 				set(i, evaluate(alpha));
 			}
 		}
 
-		float sample(float alpha) const {
+		double sample(double alpha) const {
 			return bicubic_1d(alpha, _alphaSize, [&](int x) {
 				return get(x);
 			});
 		}
-		void set(int x, float value) {
+		void set(int x, double value) {
 			_values[x] = value;
 		}
-		float get(int x) const {
+		double get(int x) const {
 			return _values[x];
 		}
 		int alphaSize() const {
@@ -137,7 +137,7 @@ namespace rt {
 			archive(CEREAL_NVP(_alphaSize), CEREAL_NVP(_values));
 		}
 		int _alphaSize = 0;
-		std::vector<float> _values;
+		std::vector<double> _values;
 	};
 
 
@@ -161,18 +161,18 @@ namespace rt {
 		}
 
 		// evaluate I_dot_inverse(alpha, u)
-		void build(int alphaSize, int uSize, std::function<float(float, float)> I_dot_inverse) {
+		void build(int alphaSize, int uSize, std::function<double(double, double)> I_dot_inverse) {
 			_alphaSize = alphaSize;
 			_uSize = uSize;
 			_values.resize(_alphaSize * _uSize);
 
 			tbb::parallel_for(tbb::blocked_range<int>(0, _uSize), [&](const tbb::blocked_range<int> &range) {
 				for (int j = range.begin(); j < range.end(); ++j) {
-					float u = (float)j / (_uSize - 1);
+					double u = (double)j / (_uSize - 1);
 					for (int i = 0; i < _alphaSize; ++i) {
 						// alpha == 0 を回避するために i == 0 を回避する
-						float alpha = (float)std::max(i, 1) / (_alphaSize - 1);
-						float value = I_dot_inverse(1.0 - alpha, u);
+						double alpha = (double)std::max(i, 1) / (_alphaSize - 1);
+						double value = I_dot_inverse(1.0 - alpha, u);
 						set(i, j, value);
 					}
 
@@ -180,15 +180,15 @@ namespace rt {
 				}
 			});
 		}
-		float sample(float alpha, float u) const {
+		double sample(double alpha, double u) const {
 			return bicubic_2d(alpha, u, _alphaSize, _uSize, [&](int x, int y) {
 				return get(x, y);
 			});
 		}
-		void set(int x, int y, float value) {
+		void set(int x, int y, double value) {
 			_values[y * _alphaSize + x] = value;
 		}
-		float get(int x, int y) const {
+		double get(int x, int y) const {
 			return _values[y * _alphaSize + x];
 		}
 		int alphaSize() const {
@@ -208,6 +208,6 @@ namespace rt {
 
 		int _alphaSize = 0;
 		int _uSize = 0;
-		std::vector<float> _values;
+		std::vector<double> _values;
 	};
 }

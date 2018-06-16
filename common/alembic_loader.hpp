@@ -10,13 +10,13 @@
 
 namespace rt {
 	typedef strict_variant::variant<
-		glm::vec3,
-		float,
+		glm::dvec3,
+		double,
 		std::string
 	> AttributeVariant;
 	
 	struct AlembicGeometry {
-		std::vector<glm::vec3> points;
+		std::vector<glm::dvec3> points;
 		std::vector<glm::ivec3> primitives;
 		std::map<std::string, std::vector<AttributeVariant>> primitiveAttributes;
 	};
@@ -61,7 +61,7 @@ namespace rt {
 			std::vector<AttributeVariant> values(sample->size());
 			for (int j = 0; j < sample->size(); ++j) {
 				auto value = sample->get()[j];
-				values[j] = glm::vec3(value.x, value.y, value.z);
+				values[j] = glm::dvec3(value.x, value.y, value.z);
 			}
 			return values;
 		} else if(dataType.getExtent() == 1 && dataType.getPod() == kFloat32POD) {
@@ -193,18 +193,18 @@ namespace rt {
 		return expands;
 	}
 
-	inline std::vector<glm::vec3> toVec3Array(V3fArraySamplePtr sample) {
-		std::vector<glm::vec3> values(sample->size());
+	inline std::vector<glm::dvec3> toVec3Array(V3fArraySamplePtr sample) {
+		std::vector<glm::dvec3> values(sample->size());
 		for (int j = 0; j < sample->size(); ++j) {
 			auto value = sample->get()[j];
-			values[j] = glm::vec3(value.x, value.y, value.z);
+			values[j] = glm::dvec3(value.x, value.y, value.z);
 		}
 		return values;
 	}
 
-	inline std::vector<glm::vec3> propertyArrayVec3(ICompoundProperty props, const char *dir) throw(std::exception) {
+	inline std::vector<glm::dvec3> propertyArrayVec3(ICompoundProperty props, const char *dir) throw(std::exception) {
 		bool found = false;
-		std::vector<glm::vec3> values;
+		std::vector<glm::dvec3> values;
 		visitProperties(props,
 			[](IScalarProperty prop, std::string name) {},
 			[&](IArrayProperty prop, std::string name) {
@@ -217,7 +217,7 @@ namespace rt {
 				values.resize(sample->size());
 				for (int j = 0; j < sample->size(); ++j) {
 					auto value = sample->get()[j];
-					values[j] = glm::vec3(value.x, value.y, value.z);
+					values[j] = glm::dvec3(value.x, value.y, value.z);
 				}
 			}
 		},
@@ -228,15 +228,15 @@ namespace rt {
 		}
 		return values;
 	}
-	inline float propertyScalarFloat(ICompoundProperty props, const char *dir) {
+	inline double propertyScalarFloat(ICompoundProperty props, const char *dir) {
 		bool found = false;
 		float value = 0.0f;
 		visitProperties(props,
 			[&](IScalarProperty prop, std::string name) {
 			if (name == dir) {
 				found = true;
-				IFloatProperty floatProp(prop.getParent(), prop.getName());
-				floatProp.get(value);
+				IFloatProperty doubleProp(prop.getParent(), prop.getName());
+				doubleProp.get(value);
 			}
 		},
 			[](IArrayProperty prop, std::string name) {},
@@ -317,9 +317,9 @@ namespace rt {
 			geometry.points.resize(PSample->size());
 			for (int i = 0; i < PSample->size(); ++i) {
 				auto p = PSample->get()[i];
-				auto point = glm::vec3(p.x, p.y, p.z);
-				point = transform * glm::vec4(point, 1.0f);
-				geometry.points[i] = glm::vec3(point.x, point.y, point.z);
+				auto point = glm::dvec3(p.x, p.y, p.z);
+				point = transform * glm::dvec4(point, 1.0);
+				geometry.points[i] = glm::dvec3(point.x, point.y, point.z);
 			}
 
 			Abc::IInt32ArrayProperty FaceCounts = mesh.getFaceCountsProperty();
@@ -394,8 +394,8 @@ namespace rt {
 				double aperture = sample.getVerticalAperture() /*centimeters*/ / 100.0;
 				double focalLength = sample.getFocalLength() /*millimeters*/ / 1000.0;
 				double fovy = std::atan2(aperture * 0.5, focalLength) * 2.0;
-				setting.fovy = (float)fovy;
-				setting.focasDistance = (float)sample.getFocusDistance();
+				setting.fovy = (double)fovy;
+				setting.focasDistance = (double)sample.getFocusDistance();
 
 				// FStop = FocalLength / (Radius * 2)
 				// Radius = FocalLength / (2 * FStop)
@@ -432,7 +432,7 @@ namespace rt {
 				setting.lookat = origin + front;
 				setting.up = up;
 
-				// setting.lensRadius = 0.0f;
+				// setting.lensRadius = 0.0;
 
 				scene.camera = Camera(setting);
 			}
@@ -482,13 +482,13 @@ namespace rt {
 							LambertianMaterial m;
 							if (abcGeom.primitiveAttributes.count("Le")) {
 								auto Le = abcGeom.primitiveAttributes["Le"][primID];
-								if (auto LeVec3 = strict_variant::get<glm::vec3>(&Le)) {
+								if (auto LeVec3 = strict_variant::get<glm::dvec3>(&Le)) {
 									m.Le = *LeVec3;
 								}
 							}
 							if (abcGeom.primitiveAttributes.count("Cd")) {
 								auto Cd = abcGeom.primitiveAttributes["Cd"][primID];
-								if (auto CdVec3 = strict_variant::get<glm::vec3>(&Cd)) {
+								if (auto CdVec3 = strict_variant::get<glm::dvec3>(&Cd)) {
 									m.R = *CdVec3;
 								}
 							}
@@ -498,7 +498,7 @@ namespace rt {
 							MicrofacetConductorMaterial m;
 							if (abcGeom.primitiveAttributes.count("roughness")) {
 								const std::vector<AttributeVariant> &roughnesses = abcGeom.primitiveAttributes["roughness"];
-								if (auto roughness = strict_variant::get<float>(&roughnesses[primID])) {
+								if (auto roughness = strict_variant::get<double>(&roughnesses[primID])) {
 									m.alpha = (*roughness) * (*roughness);
 								}
 							}
@@ -508,7 +508,7 @@ namespace rt {
 							MicrofacetCoupledConductorMaterial m;
 							if (abcGeom.primitiveAttributes.count("roughness")) {
 								const std::vector<AttributeVariant> &roughnesses = abcGeom.primitiveAttributes["roughness"];
-								if (auto roughness = strict_variant::get<float>(&roughnesses[primID])) {
+								if (auto roughness = strict_variant::get<double>(&roughnesses[primID])) {
 									m.alpha = (*roughness) * (*roughness);
 								}
 							}
@@ -518,13 +518,13 @@ namespace rt {
 							MicrofacetCoupledDielectricsMaterial m;
 							if (abcGeom.primitiveAttributes.count("roughness")) {
 								const std::vector<AttributeVariant> &roughnesses = abcGeom.primitiveAttributes["roughness"];
-								if (auto roughness = strict_variant::get<float>(&roughnesses[primID])) {
+								if (auto roughness = strict_variant::get<double>(&roughnesses[primID])) {
 									m.alpha = (*roughness) * (*roughness);
 								}
 							}
 							if (abcGeom.primitiveAttributes.count("Cd")) {
 								const std::vector<AttributeVariant> &Cd = abcGeom.primitiveAttributes["Cd"];
-								if (auto CdVec3 = strict_variant::get<glm::vec3>(&Cd[primID])) {
+								if (auto CdVec3 = strict_variant::get<glm::dvec3>(&Cd[primID])) {
 									m.Cd = *CdVec3;
 								}
 							}

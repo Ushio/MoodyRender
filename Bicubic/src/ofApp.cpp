@@ -8,58 +8,58 @@
 #include <tbb/tbb.h>
 
 // zが上の座標系に移動する行列
-inline glm::mat3 to_bxdf_basis_transform(const glm::vec3 &n) {
-	glm::vec3 xaxis;
-	glm::vec3 zaxis = n;
-	glm::vec3 yaxis;
-	if (0.999f < glm::abs(zaxis.z)) {
-		xaxis = glm::normalize(glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), zaxis));
+inline glm::mat3 to_bxdf_basis_transform(const glm::dvec3 &n) {
+	glm::dvec3 xaxis;
+	glm::dvec3 zaxis = n;
+	glm::dvec3 yaxis;
+	if (0.999 < glm::abs(zaxis.z)) {
+		xaxis = glm::normalize(glm::cross(glm::dvec3(0.0, 1.0, 0.0), zaxis));
 	}
 	else {
-		xaxis = glm::normalize(glm::cross(glm::vec3(0.0f, 0.0f, 1.0f), zaxis));
+		xaxis = glm::normalize(glm::cross(glm::dvec3(0.0, 0.0, 1.0), zaxis));
 	}
 	yaxis = glm::cross(zaxis, xaxis);
 	return glm::transpose(glm::mat3(xaxis, yaxis, zaxis));
 }
-inline glm::vec3 from_bxdf(const glm::vec3 &n, const glm::vec3 &bxdf_dir) {
+inline glm::dvec3 from_bxdf(const glm::dvec3 &n, const glm::dvec3 &bxdf_dir) {
 	return glm::transpose(to_bxdf_basis_transform(n)) * bxdf_dir;
 }
 
-inline float evaluate_albedo(float o_theta, float alpha) {
+inline double evaluate_albedo(double o_theta, double alpha) {
 	using namespace rt;
-	glm::vec3 wo = rt::polar_to_cartesian(o_theta, 0.0f);
+	glm::dvec3 wo = rt::polar_to_cartesian(o_theta, 0.0);
 
 	int SampleCount = 100000;
 	Xor *random = new Xor();
 
-	glm::vec3 Ng(0.0f, 0.0f, 1.0f);
+	glm::dvec3 Ng(0.0, 0.0, 1.0);
 
 	double albedo_sum = 0.0;
 	for (int i = 0; i < SampleCount; ++i) {
-		float theta = std::atan(std::sqrt(-alpha * alpha * std::log(1.0f - random->uniform())));
-		float phi = random->uniform(0.0f, glm::two_pi<double>());
-		glm::vec3 sample = polar_to_cartesian(theta, phi);
-		glm::vec3 harf = from_bxdf(Ng, sample);
-		glm::vec3 wi = glm::reflect(-wo, harf);
-		float pdf_omega = D_Beckman(Ng, harf, alpha) * glm::dot(Ng, harf) / (4.0f * glm::dot(wi, harf));
-		if (glm::dot(Ng, wi) <= 0.0f) {
+		double theta = std::atan(std::sqrt(-alpha * alpha * std::log(1.0 - random->uniform())));
+		double phi = random->uniform(0.0, glm::two_pi<double>());
+		glm::dvec3 sample = polar_to_cartesian(theta, phi);
+		glm::dvec3 harf = from_bxdf(Ng, sample);
+		glm::dvec3 wi = glm::reflect(-wo, harf);
+		double pdf_omega = D_Beckman(Ng, harf, alpha) * glm::dot(Ng, harf) / (4.0 * glm::dot(wi, harf));
+		if (glm::dot(Ng, wi) <= 0.0) {
 			continue;
 		}
 
-		glm::vec3 h = glm::normalize(wi + wo);
-		float d = D_Beckman(Ng, h, alpha);
-		float g = G2_height_correlated_beckmann(wi, wo, h, Ng, alpha);
+		glm::dvec3 h = glm::normalize(wi + wo);
+		double d = D_Beckman(Ng, h, alpha);
+		double g = G2_height_correlated_beckmann(wi, wo, h, Ng, alpha);
 
-		float cos_term_wo = glm::dot(Ng, wo);
-		float cos_term_wi = glm::dot(Ng, wi);
+		double cos_term_wo = glm::dot(Ng, wo);
+		double cos_term_wi = glm::dot(Ng, wi);
 
-		float brdf_without_f = d * g / (4.0f * cos_term_wo * cos_term_wi);
+		double brdf_without_f = d * g / (4.0 * cos_term_wo * cos_term_wi);
 
-		float cosThetaFresnel = glm::dot(h, wo);
-		float f = fresnel_dielectrics(cosThetaFresnel);
+		double cosThetaFresnel = glm::dot(h, wo);
+		double f = fresnel_dielectrics(cosThetaFresnel);
 
-		float brdf = f * brdf_without_f * cos_term_wi;
-		float albedo = brdf * cos_term_wi / pdf_omega;
+		double brdf = f * brdf_without_f * cos_term_wi;
+		double albedo = brdf * cos_term_wi / pdf_omega;
 
 		if (std::isfinite(albedo)) {
 			albedo_sum += albedo;
@@ -77,11 +77,11 @@ public:
 	void load(std::string path) {
 		_specular_albedo.load(path);
 	}
-	float sample(float o_theta, float alpha) {
-		float u = ofMap(alpha, 0.0001f, 1.0f, 0.0f, 1.0f);
-		float v = ofMap(o_theta, 0.0001f, glm::radians(90.0f), 0.0f, 1.0f);
-		float *p = _specular_albedo.getPixels().getPixels();
-		float value = bicubic_2d(u, v, _specular_albedo.getWidth(), _specular_albedo.getHeight(), [&](int x, int y) { return p[y * (int)_specular_albedo.getWidth() + x]; });
+	double sample(double o_theta, double alpha) {
+		double u = ofMap(alpha, 0.0001, 1.0, 0.0, 1.0);
+		double v = ofMap(o_theta, 0.0001, glm::radians(90.0), 0.0, 1.0);
+		double *p = _specular_albedo.getPixels().getPixels();
+		double value = bicubic_2d(u, v, _specular_albedo.getWidth(), _specular_albedo.getHeight(), [&](int x, int y) { return p[y * (int)_specular_albedo.getWidth() + x]; });
 		return value;
 	}
 	ofFloatImage _specular_albedo;
@@ -91,10 +91,10 @@ public:
 	void load(std::string path) {
 		_specular_albedo_avg.load(path);
 	}
-	float sample(float alpha) {
-		float u = ofMap(alpha, 0.0001f, 1.0f, 0.0f, 1.0f);
-		float *p = _specular_albedo_avg.getPixels().getPixels();
-		float value = bicubic_1d(u, _specular_albedo_avg.getWidth(), [&](int x) { return p[x]; });
+	double sample(double alpha) {
+		double u = ofMap(alpha, 0.0001, 1.0, 0.0, 1.0);
+		double *p = _specular_albedo_avg.getPixels().getPixels();
+		double value = bicubic_1d(u, _specular_albedo_avg.getWidth(), [&](int x) { return p[x]; });
 		return value;
 	}
 	ofFloatImage _specular_albedo_avg;
@@ -102,35 +102,35 @@ public:
 
 //--------------------------------------------------------------
 void ofApp::setup(){
-	_camera.setNearClip(0.1f);
-	_camera.setFarClip(100.0f);
-	_camera.setDistance(5.0f);
+	_camera.setNearClip(0.1);
+	_camera.setFarClip(100.0);
+	_camera.setDistance(5.0);
 
 	using namespace rt;
 
 	//ofFloatImage image;
 	//image.allocate(128, 128, OF_IMAGE_GRAYSCALE);
-	//float *p = image.getPixels().getPixels();
+	//double *p = image.getPixels().getPixels();
 	//for (int y = 0; y < 128; ++y) {
 	//	for (int x = 0; x < 128; ++x) {
-	//		p[y * 128 + x] = (float)x / 127;
+	//		p[y * 128 + x] = (double)x / 127;
 	//	}
 	//}
 	// using namespace rt;
 
-	// evaluate_albedo(glm::radians(30.0f), 0.2f);
+	// evaluate_albedo(glm::radians(30.0), 0.2);
 
 	//int ComputeSize = 128;
 	//ofFloatImage image;
 	//image.allocate(ComputeSize, ComputeSize, OF_IMAGE_GRAYSCALE);
-	//float *p = image.getPixels().getPixels();
+	//double *p = image.getPixels().getPixels();
 
 	//tbb::parallel_for(tbb::blocked_range<int>(0, ComputeSize), [&](const tbb::blocked_range<int> &range) {
 	//	for (int y = range.begin(); y < range.end(); ++y) {
 	//		for (int x = 0; x < ComputeSize; ++x) {
-	//			float alpha = ofMap(x, 0, ComputeSize - 1, 0.0001f, 1.0f);
-	//			float o_theta = ofMap(y, 0, ComputeSize - 1, 0.0001f, glm::radians(90.0f));
-	//			float albedo = evaluate_albedo(o_theta, alpha);
+	//			double alpha = ofMap(x, 0, ComputeSize - 1, 0.0001, 1.0);
+	//			double o_theta = ofMap(y, 0, ComputeSize - 1, 0.0001, glm::radians(90.0));
+	//			double albedo = evaluate_albedo(o_theta, alpha);
 	//			p[y * ComputeSize + x] = albedo;
 	//		}
 
@@ -146,14 +146,14 @@ void ofApp::setup(){
 	int ComputeSize = 128;
 	ofFloatImage image;
 	image.allocate(ComputeSize, Height, OF_IMAGE_GRAYSCALE);
-	float *p = image.getPixels().getPixels();
+	double *p = image.getPixels().getPixels();
 	for (int x = 0; x < ComputeSize; ++x) {
-		float alpha = ofMap(x, 0, ComputeSize - 1, 0.0001f, 1.0f);
+		double alpha = ofMap(x, 0, ComputeSize - 1, 0.0001, 1.0);
 
 		double value = integrate_composite_simpson<100>([&](double phi) {
 			return integrate_composite_simpson<100>([&](double theta) {
 				double jacobian = std::sin(theta);
-				glm::vec3 sample_m = polar_to_cartesian(theta, phi);
+				glm::dvec3 sample_m = polar_to_cartesian(theta, phi);
 				double cosTheta = sample_m.z;
 				double value = specularAlbedo.sample(theta, alpha) * cosTheta;
 				return value * jacobian;
@@ -171,47 +171,47 @@ void ofApp::setup(){
 
 	//for (int y = 0; y < ComputeSize; ++y) {
 	//	for (int x = 0; x < ComputeSize; ++x) {
-	//		float alpha   = ofMap(x, 0, ComputeSize - 1, 0.0001f, 1.0f);
-	//		float o_theta = ofMap(x, 0, ComputeSize - 1, 0.0001f, glm::radians(90.0f));
-	//		float albedo = evaluate_albedo(o_theta, alpha);
+	//		double alpha   = ofMap(x, 0, ComputeSize - 1, 0.0001, 1.0);
+	//		double o_theta = ofMap(x, 0, ComputeSize - 1, 0.0001, glm::radians(90.0));
+	//		double albedo = evaluate_albedo(o_theta, alpha);
 	//		p[y * 128 + x] = albedo;
 	//	}
 	//	printf("%d line done.\n", y);
 	//}
 	
 
-	//float alpha = 0.2f;
-	//glm::vec3 wo = rt::polar_to_cartesian(glm::radians(30.0f), 0.0f);
+	//double alpha = 0.2;
+	//glm::dvec3 wo = rt::polar_to_cartesian(glm::radians(30.0), 0.0);
 	//int SampleCount = 100000;
 	//Xor *random = new Xor();
 
-	//glm::vec3 Ng(0.0f, 0.0f, 1.0f);
+	//glm::dvec3 Ng(0.0, 0.0, 1.0);
 
-	//float albedo_sum = 0.0f;
+	//double albedo_sum = 0.0;
 	//for (int i = 0; i < SampleCount; ++i) {
-	//	float theta = std::atan(std::sqrt(-alpha * alpha * std::log(1.0f - random->uniform())));
-	//	float phi = random->uniform(0.0f, glm::two_pi<double>());
-	//	glm::vec3 sample = polar_to_cartesian(theta, phi);
-	//	glm::vec3 harf = from_bxdf(Ng, sample);
-	//	glm::vec3 wi = glm::reflect(-wo, harf);
-	//	float pdf_omega = D_Beckman(Ng, harf, alpha) * glm::dot(Ng, harf) / (4.0f * glm::dot(wi, harf));
-	//	if (glm::dot(Ng, wi) <= 0.0f) {
+	//	double theta = std::atan(std::sqrt(-alpha * alpha * std::log(1.0 - random->uniform())));
+	//	double phi = random->uniform(0.0, glm::two_pi<double>());
+	//	glm::dvec3 sample = polar_to_cartesian(theta, phi);
+	//	glm::dvec3 harf = from_bxdf(Ng, sample);
+	//	glm::dvec3 wi = glm::reflect(-wo, harf);
+	//	double pdf_omega = D_Beckman(Ng, harf, alpha) * glm::dot(Ng, harf) / (4.0 * glm::dot(wi, harf));
+	//	if (glm::dot(Ng, wi) <= 0.0) {
 	//		continue;
 	//	}
 
-	//	glm::vec3 h = glm::normalize(wi + wo);
-	//	float d = D_Beckman(Ng, h, alpha);
-	//	float g = G2_height_correlated_beckmann(wi, wo, h, Ng, alpha);
+	//	glm::dvec3 h = glm::normalize(wi + wo);
+	//	double d = D_Beckman(Ng, h, alpha);
+	//	double g = G2_height_correlated_beckmann(wi, wo, h, Ng, alpha);
 
-	//	float cos_term_wo = glm::dot(Ng, wo);
-	//	float cos_term_wi = glm::dot(Ng, wi);
+	//	double cos_term_wo = glm::dot(Ng, wo);
+	//	double cos_term_wi = glm::dot(Ng, wi);
 
-	//	float brdf_without_f = d * g / (4.0f * cos_term_wo * cos_term_wi);
+	//	double brdf_without_f = d * g / (4.0 * cos_term_wo * cos_term_wi);
 
-	//	float cosThetaFresnel = glm::dot(h, wo);
-	//	float f = fresnel_dielectrics(cosThetaFresnel);
+	//	double cosThetaFresnel = glm::dot(h, wo);
+	//	double f = fresnel_dielectrics(cosThetaFresnel);
 
-	//	float brdf = f * brdf_without_f * cos_term_wi;
+	//	double brdf = f * brdf_without_f * cos_term_wi;
 
 	//	albedo_sum += brdf * cos_term_wi / pdf_omega;
 
@@ -233,9 +233,9 @@ void ofApp::draw() {
 	ofClear(0);
 	_camera.begin();
 	ofPushMatrix();
-	ofRotateZ(90.0f);
+	ofRotateZ(90.0);
 	ofSetColor(128);
-	ofDrawGridPlane(1.0f);
+	ofDrawGridPlane(1.0);
 	ofPopMatrix();
 
 	ofPushMatrix();
@@ -244,14 +244,14 @@ void ofApp::draw() {
 
 #if 0
 	rt::Xor random;
-	float image[4];
+	double image[4];
 	for (int i = 0; i < 4; ++i) {
-		image[i] = random.uniformf();
+		image[i] = random.uniform();
 	}
 
 	ofSetColor(255);
 	for (int i = 0; i < 4; ++i) {
-		ofDrawSphere(i, image[i], 0.05f);
+		ofDrawSphere(i, image[i], 0.05);
 	}
 
 	ofMesh mesh;
@@ -259,9 +259,9 @@ void ofApp::draw() {
 
 	int N = 1000; 
 	for (int i = 0; i < N; ++i) {
-		float x = ofMap(i, 0, N - 1, -0.2f, 1.2f);
-		float value = bicubic_1d(x, 4, [&](int x) { return image[x]; });
-		mesh.addVertex(glm::vec3(x * 3, value, 0.0f));
+		double x = ofMap(i, 0, N - 1, -0.2, 1.2);
+		double value = bicubic_1d(x, 4, [&](int x) { return image[x]; });
+		mesh.addVertex(glm::dvec3(x * 3, value, 0.0));
 	}
 	mesh.draw();
 #else
@@ -269,17 +269,17 @@ void ofApp::draw() {
 	const int Y_SIZE = 6;
 
 	rt::Xor random;
-	float image[Y_SIZE][X_SIZE];
+	double image[Y_SIZE][X_SIZE];
 	for (int z = 0; z < Y_SIZE; ++z) {
 		for (int x = 0; x < X_SIZE; ++x) {
-			image[z][x] = random.uniformf();
+			image[z][x] = random.uniform();
 		}
 	}
 
 	ofSetColor(255);
 	for (int z = 0; z < Y_SIZE; ++z) {
 		for (int x = 0; x < X_SIZE; ++x) {
-			ofDrawSphere(x, image[z][x], z, 0.05f);
+			ofDrawSphere(x, image[z][x], z, 0.05);
 		}
 	}
 
@@ -288,13 +288,13 @@ void ofApp::draw() {
 
 	int N = 50;
 	for (int yi = 0; yi < N; ++yi) {
-		float y = ofMap(yi, 0, N - 1, -0.5f, 1.5f);
+		double y = ofMap(yi, 0, N - 1, -0.5, 1.5);
 
 		for (int xi = 0; xi < N; ++xi) {
-			float x = ofMap(xi, 0, N - 1, -0.5f, 1.5f);
+			double x = ofMap(xi, 0, N - 1, -0.5, 1.5);
 
-			float value = bicubic_2d(x, y, X_SIZE, Y_SIZE, [&](int x, int y) { return image[y][x]; });
-			mesh.addVertex(glm::vec3(x * (X_SIZE - 1), value, y * (Y_SIZE - 1)));
+			double value = bicubic_2d(x, y, X_SIZE, Y_SIZE, [&](int x, int y) { return image[y][x]; });
+			mesh.addVertex(glm::dvec3(x * (X_SIZE - 1), value, y * (Y_SIZE - 1)));
 		}
 	}
 	mesh.draw();

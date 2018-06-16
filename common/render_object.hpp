@@ -14,7 +14,7 @@ namespace rt {
 	class Geometry {
 	public:
 		struct Point {
-			glm::vec3 P;
+			glm::dvec3 P;
 		};
 		struct Primitive {
 			glm::ivec3 indices;

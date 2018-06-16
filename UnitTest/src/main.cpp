@@ -121,20 +121,20 @@ TEST_CASE("LambertianMaterial", "[LambertianMaterial]") {
 		for (int j = 0; j < 100; ++j) {
 
 			// alphaが小さい場合、simpsonによる積分が適さない
-			float alpha = random->uniformf(0.1f, 1.0f);
-			glm::vec3 Ng(0.0f, 0.0f, 1.0f);
-			glm::vec3 wo = LambertianSampler::sample(random, Ng);
+			double alpha = random->uniform(0.1, 1.0);
+			glm::dvec3 Ng(0.0, 0.0, 1.0);
+			glm::dvec3 wo = LambertianSampler::sample(random, Ng);
 
 			LambertianMaterial m;
 			m.Ng = Ng;
-			m.Le = glm::vec3(0.0);
-			m.R = glm::vec3(1.0);
+			m.Le = glm::dvec3(0.0);
+			m.R = glm::dvec3(1.0);
 
 			double result = hemisphere_composite_simpson<double>([&](double theta, double phi) {
-				glm::vec3 wi = rt::polar_to_cartesian((float)theta, (float)phi);
+				glm::dvec3 wi = rt::polar_to_cartesian((double)theta, (double)phi);
 
-				glm::vec3 brdf = m.bxdf(wo, wi);
-				float cosTheta = glm::dot(m.Ng, wi);
+				glm::dvec3 brdf = m.bxdf(wo, wi);
+				double cosTheta = glm::dot(m.Ng, wi);
 
 				REQUIRE(std::abs(brdf.x - brdf.y) < 1.0e-6);
 				REQUIRE(std::abs(brdf.y - brdf.z) < 1.0e-6);
@@ -169,18 +169,16 @@ TEST_CASE("microfacet", "[microfacet]") {
 		using namespace rt;
 
 		rt::Xor64 random;
-		for (int j = 0; j < 100; ++j) {
-			//int sample = 0;
-
+		for (int j = 0; j < 32; ++j) {
 			// alphaが小さい場合、simpsonによる積分が適さない
-			float alpha = random.uniformf(0.1f, 1.0f);
+			double alpha = random.uniform(0.1, 1.0);
 
 			double result = hemisphere_composite_simpson<double>([&](double theta, double phi) {
-				glm::vec3 wi = rt::polar_to_cartesian((float)theta, (float)phi);
-				glm::vec3 Ng(0.0f, 0.0f, 1.0f);
-				glm::vec3 sample_m = rt::polar_to_cartesian((float)theta, (float)phi);
-				float cosTheta = glm::dot(Ng, sample_m);
-				float value = rt::D_Beckmann(Ng, sample_m, alpha) * cosTheta;
+				glm::dvec3 wi = rt::polar_to_cartesian((double)theta, (double)phi);
+				glm::dvec3 Ng(0.0, 0.0, 1.0);
+				glm::dvec3 sample_m = rt::polar_to_cartesian((double)theta, (double)phi);
+				double cosTheta = glm::dot(Ng, sample_m);
+				double value = rt::D_Beckmann(Ng, sample_m, alpha) * cosTheta;
 				return (double)value;
 			}, 500);
 			CAPTURE(result);
@@ -197,9 +195,9 @@ TEST_CASE("microfacet", "[microfacet]") {
 		for (int j = 0; j < 32; ++j) {
 
 			// alphaが小さい場合、simpsonによる積分が適さない
-			float alpha = random->uniformf(0.1f, 1.0f);
-			glm::vec3 Ng(0.0f, 0.0f, 1.0f);
-			glm::vec3 wo = LambertianSampler::sample(random, Ng);
+			double alpha = random->uniform(0.1, 1.0);
+			glm::dvec3 Ng(0.0, 0.0, 1.0);
+			glm::dvec3 wo = LambertianSampler::sample(random, Ng);
 
 			MicrofacetCoupledConductorMaterial m;
 			m.Ng = Ng;
@@ -207,10 +205,10 @@ TEST_CASE("microfacet", "[microfacet]") {
 			m.useFresnel = false;
 
 			double result = hemisphere_composite_simpson<double>([&](double theta, double phi) {
-				glm::vec3 wi = rt::polar_to_cartesian((float)theta, (float)phi);
+				glm::dvec3 wi = rt::polar_to_cartesian((double)theta, (double)phi);
 
-				glm::vec3 brdf = m.bxdf(wo, wi);
-				float cosTheta = glm::dot(m.Ng, wi);
+				glm::dvec3 brdf = m.bxdf(wo, wi);
+				double cosTheta = glm::dot(m.Ng, wi);
 
 				REQUIRE(std::abs(brdf.x - brdf.y) < 1.0e-6);
 				REQUIRE(std::abs(brdf.y - brdf.z) < 1.0e-6);
@@ -232,19 +230,19 @@ TEST_CASE("microfacet", "[microfacet]") {
 		for (int j = 0; j < 32; ++j) {
 
 			// alphaが小さい場合、simpsonによる積分が適さない
-			float alpha = random->uniformf(0.1f, 1.0f);
-			glm::vec3 Ng(0.0f, 0.0f, 1.0f);
-			glm::vec3 wo = LambertianSampler::sample(random, Ng);
+			double alpha = random->uniform(0.1, 1.0);
+			glm::dvec3 Ng(0.0, 0.0, 1.0);
+			glm::dvec3 wo = LambertianSampler::sample(random, Ng);
 
 			MicrofacetCoupledDielectricsMaterial m;
 			m.Ng = Ng;
 			m.alpha = alpha;
 
 			double result = hemisphere_composite_simpson<double>([&](double theta, double phi) {
-				glm::vec3 wi = rt::polar_to_cartesian((float)theta, (float)phi);
+				glm::dvec3 wi = rt::polar_to_cartesian((double)theta, (double)phi);
 
-				glm::vec3 brdf = m.bxdf(wo, wi);
-				float cosTheta = glm::dot(m.Ng, wi);
+				glm::dvec3 brdf = m.bxdf(wo, wi);
+				double cosTheta = glm::dot(m.Ng, wi);
 
 				REQUIRE(std::abs(brdf.x - brdf.y) < 1.0e-6);
 				REQUIRE(std::abs(brdf.y - brdf.z) < 1.0e-6);
@@ -267,9 +265,9 @@ TEST_CASE("microfacet", "[microfacet]") {
 		for (int j = 0; j < 32; ++j) {
 
 			// alphaが小さい場合、simpsonによる積分が適さない
-			float alpha = random->uniformf(0.1f, 1.0f);
-			glm::vec3 Ng(0.0f, 0.0f, 1.0f);
-			glm::vec3 wo = LambertianSampler::sample(random, Ng);
+			double alpha = random->uniform(0.1, 1.0);
+			glm::dvec3 Ng(0.0, 0.0, 1.0);
+			glm::dvec3 wo = LambertianSampler::sample(random, Ng);
 
 			MicrofacetCoupledConductorMaterial m;
 			m.Ng = Ng;
@@ -279,20 +277,20 @@ TEST_CASE("microfacet", "[microfacet]") {
 			OnlineMean<double> mean;
 
 			for (int i = 0; i < 500000; ++i) {
-				glm::vec3 wi = m.sample(random, wo);
-				glm::vec3 bxdf = m.bxdf(wo, wi);
-				float pdf = m.pdf(wo, wi);
-				float cosTheta = glm::dot(m.Ng, wi);
+				glm::dvec3 wi = m.sample(random, wo);
+				glm::dvec3 bxdf = m.bxdf(wo, wi);
+				double pdf = m.pdf(wo, wi);
+				double cosTheta = glm::dot(m.Ng, wi);
 
 				REQUIRE(std::abs(bxdf.x - bxdf.y) < 1.0e-6);
 				REQUIRE(std::abs(bxdf.y - bxdf.z) < 1.0e-6);
 
-				glm::vec3 value;
-				if (glm::any(glm::greaterThanEqual(bxdf, glm::vec3(1.0e-6f)))) {
+				glm::dvec3 value;
+				if (glm::any(glm::greaterThanEqual(bxdf, glm::dvec3(1.0e-6f)))) {
 					value = bxdf * cosTheta / pdf;
 				}
 				else {
-					value = glm::vec3(0.0f);
+					value = glm::dvec3(0.0);
 				}
 
 				mean.addSample(value.x);
@@ -313,9 +311,9 @@ TEST_CASE("microfacet", "[microfacet]") {
 		for (int j = 0; j < 32; ++j) {
 
 			// alphaが小さい場合、simpsonによる積分が適さない
-			float alpha = random->uniformf(0.1f, 1.0f);
-			glm::vec3 Ng(0.0f, 0.0f, 1.0f);
-			glm::vec3 wo = LambertianSampler::sample(random, Ng);
+			double alpha = random->uniform(0.1, 1.0);
+			glm::dvec3 Ng(0.0, 0.0, 1.0);
+			glm::dvec3 wo = LambertianSampler::sample(random, Ng);
 
 			MicrofacetCoupledDielectricsMaterial m;
 			m.Ng = Ng;
@@ -324,20 +322,20 @@ TEST_CASE("microfacet", "[microfacet]") {
 			OnlineMean<double> mean;
 
 			for (int i = 0; i < 500000; ++i) {
-				glm::vec3 wi = m.sample(random, wo);
-				glm::vec3 bxdf = m.bxdf(wo, wi);
-				float pdf = m.pdf(wo, wi);
-				float cosTheta = glm::dot(m.Ng, wi);
+				glm::dvec3 wi = m.sample(random, wo);
+				glm::dvec3 bxdf = m.bxdf(wo, wi);
+				double pdf = m.pdf(wo, wi);
+				double cosTheta = glm::dot(m.Ng, wi);
 
 				REQUIRE(std::abs(bxdf.x - bxdf.y) < 1.0e-6);
 				REQUIRE(std::abs(bxdf.y - bxdf.z) < 1.0e-6);
 
-				glm::vec3 value;
-				if (glm::any(glm::greaterThanEqual(bxdf, glm::vec3(1.0e-6f)))) {
+				glm::dvec3 value;
+				if (glm::any(glm::greaterThanEqual(bxdf, glm::dvec3(1.0e-6f)))) {
 					value = bxdf * cosTheta / pdf;
 				}
 				else {
-					value = glm::vec3(0.0f);
+					value = glm::dvec3(0.0);
 				}
 
 				mean.addSample(value.x);
@@ -347,7 +345,6 @@ TEST_CASE("microfacet", "[microfacet]") {
 			CAPTURE(alpha);
 			CAPTURE(glm::dot(Ng, wo));
 			REQUIRE(std::abs(result - 1.0) < 1.0e-2);
-			printf("%f\n", result);
 		}
 	}
 }

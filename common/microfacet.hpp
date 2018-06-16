@@ -8,113 +8,113 @@
 #include "value_prportional_sampler.hpp"
 
 namespace rt {
-	inline float chi_plus(float x) {
-		return x <= 0.0f ? 0.0f : 1.0f;
+	inline double chi_plus(double x) {
+		return x <= 0.0 ? 0.0 : 1.0;
 	}
 
-	inline float D_Beckmann(const glm::vec3 &n, const glm::vec3 &h, float alpha) {
-		float cosTheta = glm::dot(n, h);
+	inline double D_Beckmann(const glm::dvec3 &n, const glm::dvec3 &h, double alpha) {
+		double cosTheta = glm::dot(n, h);
 
 		// chi+
 		if (cosTheta < 1.0e-5) {
-			return 0.0f;
+			return 0.0;
 		}
 
-		float cosTheta2 = cosTheta * cosTheta;
-		float cosTheta4 = cosTheta2 * cosTheta2;
-		float alpha2 = alpha * alpha;
-		float chi = chi_plus(cosTheta);
+		double cosTheta2 = cosTheta * cosTheta;
+		double cosTheta4 = cosTheta2 * cosTheta2;
+		double alpha2 = alpha * alpha;
+		double chi = chi_plus(cosTheta);
 
 		// \tan { \theta  } =\pm \frac { \sqrt { 1-\cos { \theta  }  }  }{ \cos { \theta  }  } \\ \tan ^{ 2 }{ \theta  } =\frac { 1-\cos ^{ 2 }{ \theta  }  }{ \cos ^{ 2 }{ \theta  }  } 
-		float tanTheta2 = (1.0f - cosTheta2) / cosTheta2;
-		return chi * std::exp(-tanTheta2 / alpha2) / (glm::pi<float>() * alpha2 * cosTheta4);
+		double tanTheta2 = (1.0 - cosTheta2) / cosTheta2;
+		return chi * std::exp(-tanTheta2 / alpha2) / (glm::pi<double>() * alpha2 * cosTheta4);
 	}
-	inline float lambda_beckmann(float cosTheta, float alpha) {
-		float tanThetaO = std::sqrt(1.0f - cosTheta * cosTheta) / cosTheta;
-		float a = 1.0f / (alpha * tanThetaO);
-		return (std::erf(a) - 1.0f) * 0.5f + std::exp(-a * a) / (2.0f * a * std::sqrt(glm::pi<float>()));
+	inline double lambda_beckmann(double cosTheta, double alpha) {
+		double tanThetaO = std::sqrt(1.0 - cosTheta * cosTheta) / cosTheta;
+		double a = 1.0 / (alpha * tanThetaO);
+		return (std::erf(a) - 1.0) * 0.5 + std::exp(-a * a) / (2.0 * a * std::sqrt(glm::pi<double>()));
 	}
-	inline float G2_height_correlated_beckmann(const glm::vec3 &omega_i, const glm::vec3 &omega_o, const glm::vec3 &omega_h, const glm::vec3 &n, float alpha) {
-		float numer = chi_plus(glm::dot(omega_o, omega_h)) * chi_plus(glm::dot(omega_i, omega_h));
-		float denom = (1.0f + lambda_beckmann(glm::dot(omega_o, n), alpha) + lambda_beckmann(glm::dot(omega_i, n), alpha));
+	inline double G2_height_correlated_beckmann(const glm::dvec3 &omega_i, const glm::dvec3 &omega_o, const glm::dvec3 &omega_h, const glm::dvec3 &n, double alpha) {
+		double numer = chi_plus(glm::dot(omega_o, omega_h)) * chi_plus(glm::dot(omega_i, omega_h));
+		double denom = (1.0 + lambda_beckmann(glm::dot(omega_o, n), alpha) + lambda_beckmann(glm::dot(omega_i, n), alpha));
 		return numer / denom;
 	}
 
-	inline float G2_v_cavity(glm::vec3 L, glm::vec3 V, glm::vec3 H, glm::vec3 N) {
-		float a = 2.0f * glm::dot(N, H) * glm::dot(N, V) / glm::dot(V, H);
-		float b = 2.0f * glm::dot(N, H) * glm::dot(N, L) / glm::dot(L, H);
-		return glm::min(glm::min(a, b), 1.0f);
+	inline double G2_v_cavity(glm::dvec3 L, glm::dvec3 V, glm::dvec3 H, glm::dvec3 N) {
+		double a = 2.0 * glm::dot(N, H) * glm::dot(N, V) / glm::dot(V, H);
+		double b = 2.0 * glm::dot(N, H) * glm::dot(N, L) / glm::dot(L, H);
+		return glm::min(glm::min(a, b), 1.0);
 	}
 
 	//inline double G_kalemen(Vec3 L, Vec3 V, Vec3 H, Vec3 N, double alpha) {
 	//	return 2.0 * glm::dot(N, L) * glm::dot(N, V) / (1.0 + glm::dot(L, V));
 	//}
 
-	//inline float beckmannMicrofacetBRDF_without_F(const glm::vec3 &omega_i, const glm::vec3 &omega_o, const glm::vec3 &omega_h, const glm::vec3 &Ng, float alpha) {
-	//	float d = D_Beckmann(Ng, omega_h, alpha);
-	//	float g = G2_height_correlated_beckmann(omega_i, omega_o, omega_h, Ng, alpha);
+	//inline double beckmannMicrofacetBRDF_without_F(const glm::dvec3 &omega_i, const glm::dvec3 &omega_o, const glm::dvec3 &omega_h, const glm::dvec3 &Ng, double alpha) {
+	//	double d = D_Beckmann(Ng, omega_h, alpha);
+	//	double g = G2_height_correlated_beckmann(omega_i, omega_o, omega_h, Ng, alpha);
 
-	//	float cos_term_wo = glm::dot(Ng, omega_o);
-	//	float cos_term_wi = glm::dot(Ng, omega_i);
+	//	double cos_term_wo = glm::dot(Ng, omega_o);
+	//	double cos_term_wi = glm::dot(Ng, omega_i);
 
-	//	return chi_plus(glm::dot(Ng, omega_i)) * chi_plus(glm::dot(Ng, omega_o)) *  d * g / (4.0f * cos_term_wo * cos_term_wi);
+	//	return chi_plus(glm::dot(Ng, omega_i)) * chi_plus(glm::dot(Ng, omega_o)) *  d * g / (4.0 * cos_term_wo * cos_term_wi);
 	//}
 
 	struct BeckmannImportanceSampler {
 		// サンプリング範囲が半球ではないことに注意
-		static glm::vec3 sample(PeseudoRandom *random, float alpha, glm::vec3 wo, glm::vec3 Ng) {
-			float theta = std::atan(std::sqrt(-alpha * alpha * std::log(1.0f - random->uniform())));
-			float phi = random->uniform(0.0f, glm::two_pi<double>());
-			glm::vec3 sample = polar_to_cartesian(theta, phi);
+		static glm::dvec3 sample(PeseudoRandom *random, double alpha, glm::dvec3 wo, glm::dvec3 Ng) {
+			double theta = std::atan(std::sqrt(-alpha * alpha * std::log(1.0 - random->uniform())));
+			double phi = random->uniform(0.0, glm::two_pi<double>());
+			glm::dvec3 sample = polar_to_cartesian(theta, phi);
 
-			glm::vec3 harf = from_bxdf(Ng, sample);
-			glm::vec3 wi = glm::reflect(-wo, harf);
+			glm::dvec3 harf = from_bxdf(Ng, sample);
+			glm::dvec3 wi = glm::reflect(-wo, harf);
 			return wi;
 		}
 
-		static float pdf(glm::vec3 sampled_wi, float alpha, glm::vec3 wo, glm::vec3 Ng) {
-			glm::vec3 half = glm::normalize(sampled_wi + wo);
+		static double pdf(glm::dvec3 sampled_wi, double alpha, glm::dvec3 wo, glm::dvec3 Ng) {
+			glm::dvec3 half = glm::normalize(sampled_wi + wo);
 
 			// glm::dot(sampled_wi, half)が0になるのは、
 			// wiとwoが正反対の向き、つまりかならず裏側であるので、普段は問題にならない
-			return D_Beckmann(Ng, half, alpha) * glm::dot(Ng, half) / (4.0f * glm::dot(sampled_wi, half));
+			return D_Beckmann(Ng, half, alpha) * glm::dot(Ng, half) / (4.0 * glm::dot(sampled_wi, half));
 		}
 	};
 
-	inline float fresnel_v(float n, float k, float cosTheta) {
-		float n2_add_k2 = n * n + k * k;
-		float numer = n2_add_k2 - 2.0f * n * cosTheta + cosTheta * cosTheta;
-		float denom = n2_add_k2 + 2.0f * n * cosTheta + cosTheta * cosTheta;
+	inline double fresnel_v(double n, double k, double cosTheta) {
+		double n2_add_k2 = n * n + k * k;
+		double numer = n2_add_k2 - 2.0 * n * cosTheta + cosTheta * cosTheta;
+		double denom = n2_add_k2 + 2.0 * n * cosTheta + cosTheta * cosTheta;
 		return numer / denom;
 	}
 
-	inline float fresnel_h(float n, float k, float cosTheta) {
-		float n2_add_k2_cosTheta2 = (n * n + k * k) * cosTheta * cosTheta;
-		float numer = n2_add_k2_cosTheta2 - 2.0f * n * cosTheta + 1.0f;
-		float denom = n2_add_k2_cosTheta2 + 2.0f * n * cosTheta + 1.0f;
+	inline double fresnel_h(double n, double k, double cosTheta) {
+		double n2_add_k2_cosTheta2 = (n * n + k * k) * cosTheta * cosTheta;
+		double numer = n2_add_k2_cosTheta2 - 2.0 * n * cosTheta + 1.0;
+		double denom = n2_add_k2_cosTheta2 + 2.0 * n * cosTheta + 1.0;
 		return numer / denom;
 	}
 
-	inline float fresnel_unpolarized(float n, float k, float cosTheta) {
-		return (fresnel_v(n, k, cosTheta) + fresnel_h(n, k, cosTheta)) * 0.5f;
+	inline double fresnel_unpolarized(double n, double k, double cosTheta) {
+		return (fresnel_v(n, k, cosTheta) + fresnel_h(n, k, cosTheta)) * 0.5;
 	}
 
 	// Air to Glass
-	inline float fresnel_dielectrics(float cosTheta) {
-		auto sqr = [](float x) { return x * x; };
+	inline double fresnel_dielectrics(double cosTheta) {
+		auto sqr = [](double x) { return x * x; };
 
-		float eta_t = 1.5f; // for Glass
-		float eta_i = 1.0f;
-		float c = cosTheta;
-		float g = std::sqrt(eta_t * eta_t / sqr(eta_i) - 1.0f + sqr(c));
+		double eta_t = 1.5; // for Glass
+		double eta_i = 1.0;
+		double c = cosTheta;
+		double g = std::sqrt(eta_t * eta_t / sqr(eta_i) - 1.0 + sqr(c));
 
-		float a = 0.5f * sqr(g - c) / sqr(g + c);
-		float b = 1.0f + sqr(c * (g + c) - 1.0f) / sqr(c * (g - c) + 1.0f);
+		double a = 0.5 * sqr(g - c) / sqr(g + c);
+		double b = 1.0 + sqr(c * (g + c) - 1.0) / sqr(c * (g - c) + 1.0);
 		return a * b;
 	}
 
-	inline float fresnel_shlick(float f0, float cosTheta) {
-		return f0 + (1.0f - f0) * std::pow(1.0f - cosTheta, 5);
+	inline double fresnel_shlick(double f0, double cosTheta) {
+		return f0 + (1.0 - f0) * std::pow(1.0 - cosTheta, 5);
 	}
 
 
@@ -134,68 +134,68 @@ namespace rt {
 
 			_discreteSamplers.resize(kAlphaCount);
 			for (int i = 0; i < kAlphaCount; ++i) {
-				float alpha = indexToAlpha(i, kAlphaCount);
+				double alpha = indexToAlpha(i, kAlphaCount);
 
-				std::vector<float> values(kSampleBlockCount);
+				std::vector<double> values(kSampleBlockCount);
 				for (int j = 0; j < kSampleBlockCount; ++j) {
 					values[j] = CoupledBRDF_I(indexToTheta(j, kSampleBlockCount), alpha, specularAlbedo);
 				}
-				_discreteSamplers[i] = ValueProportionalSampler<float>(values);
+				_discreteSamplers[i] = ValueProportionalSampler<double>(values);
 			}
 		}
-		float sampleTheta(float alpha, PeseudoRandom *random) const {
+		double sampleTheta(double alpha, PeseudoRandom *random) const {
 			int alphaIndex = alphaToIndex(alpha, _discreteSamplers.size());
-			const ValueProportionalSampler<float> &sampler = _discreteSamplers[alphaIndex];
+			const ValueProportionalSampler<double> &sampler = _discreteSamplers[alphaIndex];
 			int indexTheta = sampler.sample(random);
 			auto thetaRange = indexToThetaRange(indexTheta, sampler.size());
-			return random->uniformf(thetaRange.first, thetaRange.second);
+			return random->uniform(thetaRange.first, thetaRange.second);
 		}
-		float probability(float alpha, float theta) const {
+		double probability(double alpha, double theta) const {
 			int alphaIndex = alphaToIndex(alpha, _discreteSamplers.size());
-			const ValueProportionalSampler<float> &sampler = _discreteSamplers[alphaIndex];
+			const ValueProportionalSampler<double> &sampler = _discreteSamplers[alphaIndex];
 			int thetaIndex = thetaToIndex(theta, sampler.size());
 			return sampler.probability(thetaIndex);
 		}
-		int thetaSize(float alpha) const {
+		int thetaSize(double alpha) const {
 			int alphaIndex = alphaToIndex(alpha, _discreteSamplers.size());
-			const ValueProportionalSampler<float> &sampler = _discreteSamplers[alphaIndex];
+			const ValueProportionalSampler<double> &sampler = _discreteSamplers[alphaIndex];
 			return sampler.size();
 		}
 	private:
 		// 0     0.5     1
 		// |------|------|
-		int alphaToIndex(float alpha, int n)const
+		int alphaToIndex(double alpha, int n)const
 		{
 			int index = (int)(alpha * n);
 			index = std::min(index, n - 1);
 			index = std::max(index, 0);
 			return index;
 		}
-		float indexToAlpha(int index, int n) const {
-			float wide = 1.0f / n;
-			return wide * 0.5f + index * wide;
+		double indexToAlpha(int index, int n) const {
+			double wide = 1.0 / n;
+			return wide * 0.5 + index * wide;
 		}
 
 		// 0     0.5     1
 		// |------|------|
-		int thetaToIndex(float theta, int n) const
+		int thetaToIndex(double theta, int n) const
 		{
-			int index = (int)((theta * 2.0f / glm::pi<float>()) * n);
+			int index = (int)((theta * 2.0 / glm::pi<double>()) * n);
 			index = std::min(index, n - 1);
 			index = std::max(index, 0);
 			return index;
 		}
-		float indexToTheta(int index, int n) const {
-			float wide = glm::pi<float>() * 0.5f / n;
-			return wide * 0.5f + index * wide;
+		double indexToTheta(int index, int n) const {
+			double wide = glm::pi<double>() * 0.5 / n;
+			return wide * 0.5 + index * wide;
 		}
-		std::pair<float, float> indexToThetaRange(int index, int n) const {
-			float wide = glm::pi<float>() * 0.5f / n;
+		std::pair<double, double> indexToThetaRange(int index, int n) const {
+			double wide = glm::pi<double>() * 0.5 / n;
 			return std::make_pair(index * wide, (index + 1) * wide);
 		}
 
 		// alpha => table
-		std::vector<ValueProportionalSampler<float>> _discreteSamplers;
+		std::vector<ValueProportionalSampler<double>> _discreteSamplers;
 	};
 
 	class CoupledBRDFConductor {

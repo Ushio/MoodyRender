@@ -11,43 +11,43 @@
 
 inline void bake(std::string name, bool include_fresnel_dielectrics) {
 	rt::SpecularAlbedo albedo;
-	albedo.build(256, 256, [&](float alpha, float cosTheta) {
+	albedo.build(256, 256, [&](double alpha, double cosTheta) {
 		using namespace rt;
-		glm::vec3 wo = glm::vec3(std::sqrt(1.0f - cosTheta * cosTheta), 0.0f, cosTheta);
-		glm::vec3 Ng(0.0f, 0.0f, 1.0f);
+		glm::dvec3 wo = glm::dvec3(std::sqrt(1.0 - cosTheta * cosTheta), 0.0, cosTheta);
+		glm::dvec3 Ng(0.0, 0.0, 1.0);
 
 		//int SampleCount = 100000;
 		int SampleCount = 300000;
 		Xor64 random;
 
-		OnlineMean<float> mean;
+		OnlineMean<double> mean;
 		for (int i = 0; i < SampleCount; ++i) {
-			glm::vec3 wi = BeckmannImportanceSampler::sample(&random, alpha, wo, Ng);
-			float pdf_omega = BeckmannImportanceSampler::pdf(wi, alpha, wo, Ng);
+			glm::dvec3 wi = BeckmannImportanceSampler::sample(&random, alpha, wo, Ng);
+			double pdf_omega = BeckmannImportanceSampler::pdf(wi, alpha, wo, Ng);
 
-			glm::vec3 h = glm::normalize(wi + wo);
-			float d = D_Beckmann(Ng, h, alpha);
-			float g = G2_height_correlated_beckmann(wi, wo, h, Ng, alpha);
+			glm::dvec3 h = glm::normalize(wi + wo);
+			double d = D_Beckmann(Ng, h, alpha);
+			double g = G2_height_correlated_beckmann(wi, wo, h, Ng, alpha);
 
-			float cos_term_wo = glm::dot(Ng, wo);
-			float cos_term_wi = glm::dot(Ng, wi);
+			double cos_term_wo = glm::dot(Ng, wo);
+			double cos_term_wi = glm::dot(Ng, wi);
 
-			float brdf = d * g / (4.0f * cos_term_wo * cos_term_wi);
+			double brdf = d * g / (4.0 * cos_term_wo * cos_term_wi);
 			if (include_fresnel_dielectrics) {
-				float cosThetaFresnel = glm::dot(h, wo); // == glm::dot(h, wi)
-				float f = fresnel_dielectrics(cosThetaFresnel);
+				double cosThetaFresnel = glm::dot(h, wo); // == glm::dot(h, wi)
+				double f = fresnel_dielectrics(cosThetaFresnel);
 				brdf *= f;
 			}
 
-			float value = brdf * cos_term_wi / pdf_omega;
+			double value = brdf * cos_term_wi / pdf_omega;
 
 			// wiが裏面
 			if (glm::dot(wi, Ng) <= 0.0) {
-				value = 0.0f;
+				value = 0.0;
 			}
 
 			if (glm::isfinite(value) == false) {
-				value = 0.0f;
+				value = 0.0;
 			}
 
 			mean.addSample(value);
@@ -62,7 +62,7 @@ inline void bake(std::string name, bool include_fresnel_dielectrics) {
 	float *p = image.getPixels().getPixels();
 	for (int j = 0; j < albedo.cosThetaSize(); ++j) {
 		for (int i = 0; i < albedo.alphaSize(); ++i) {
-			float value = albedo.get(i, j);
+			double value = albedo.get(i, j);
 			p[j * albedo.alphaSize() + i] = value;
 		}
 	}
@@ -85,7 +85,7 @@ void bake_avg(const char *albedoFile, const char *dstName) {
 }
 
 // specularAlbedo(alpha, cosTheta)
-inline float I(double theta, double alpha, std::function<double(double, double)> specularAlbedo) {
+inline double I(double theta, double alpha, std::function<double(double, double)> specularAlbedo) {
 	return rt::composite_simpson<double>([&](double xi) {
 		double cosTheta = std::cos(xi);
 		return (1.0 - specularAlbedo(alpha, cosTheta)) * cosTheta;
@@ -97,19 +97,19 @@ inline double I_Dot(double theta, double alpha, std::function<double(double, dou
 }
 
 inline double I_Dot_Inverse(double alpha, double u, std::function<double(double, double)> specularAlbedo) {
-	double a = 0.0f;
-	double b = glm::pi<float>() * 0.5f;
+	double a = 0.0;
+	double b = glm::pi<double>() * 0.5;
 
-	double c = (a + b) * 0.5f;
+	double c = (a + b) * 0.5;
 	while(1.0e-5 < std::abs(a - b)) {
-		float value = I_Dot(c, alpha, specularAlbedo);
+		double value = I_Dot(c, alpha, specularAlbedo);
 		if (value < u) {
 			a = c;
 		}
 		else {
 			b = c;
 		}
-		c = (a + b) * 0.5f;
+		c = (a + b) * 0.5;
 	}
 	return c;
 }
@@ -126,57 +126,12 @@ void ofApp::setup() {
 
 	ofSetVerticalSync(false);
 
-	_camera.setNearClip(0.1f);
-	_camera.setFarClip(100.0f);
-	_camera.setDistance(5.0f);
+	_camera.setNearClip(0.1);
+	_camera.setFarClip(100.0);
+	_camera.setDistance(5.0);
 
 	rt::CoupledBRDFConductor::load(ofToDataPath("albedo_specular_conductor.xml").c_str(), ofToDataPath("albedo_specular_conductor_avg.xml").c_str());
 	rt::CoupledBRDFDielectrics::load(ofToDataPath("albedo_specular_dielectrics.xml").c_str(), ofToDataPath("albedo_specular_dielectrics_avg.xml").c_str());
-
-
-	{
-		rt::I_Dot_Inverse i_dot_inverse;
-		i_dot_inverse.build(256, 256, [](float alpha, float u) {
-			return I_Dot_Inverse(alpha, u, [](double alpha, double cosTheta) {
-				return rt::CoupledBRDFConductor::specularAlbedo().sample(alpha, cosTheta);
-			});
-		});
-		i_dot_inverse.save(ofToDataPath("I_Dot_Inverse_conductor.xml").c_str());
-
-		// preview
-		ofFloatImage image;
-		image.allocate(i_dot_inverse.alphaSize(), i_dot_inverse.uSize(), OF_IMAGE_GRAYSCALE);
-		float *p = image.getPixels().getPixels();
-		for (int j = 0; j < i_dot_inverse.uSize(); ++j) {
-			for (int i = 0; i < i_dot_inverse.alphaSize(); ++i) {
-				float value = i_dot_inverse.get(i, j);
-				p[j * i_dot_inverse.alphaSize() + i] = value / (glm::pi<float>() * 0.5f);
-			}
-		}
-		image.save("I_Dot_Inverse_conductor.exr");
-	}
-
-	{
-		rt::I_Dot_Inverse i_dot_inverse;
-		i_dot_inverse.build(256, 256, [](float alpha, float u) {
-			return I_Dot_Inverse(alpha, u, [](double alpha, double cosTheta) {
-				return rt::CoupledBRDFDielectrics::specularAlbedo().sample(alpha, cosTheta);
-			});
-		});
-		i_dot_inverse.save(ofToDataPath("I_Dot_Inverse_dielectrics.xml").c_str());
-
-		// preview
-		ofFloatImage image;
-		image.allocate(i_dot_inverse.alphaSize(), i_dot_inverse.uSize(), OF_IMAGE_GRAYSCALE);
-		float *p = image.getPixels().getPixels();
-		for (int j = 0; j < i_dot_inverse.uSize(); ++j) {
-			for (int i = 0; i < i_dot_inverse.alphaSize(); ++i) {
-				float value = i_dot_inverse.get(i, j);
-				p[j * i_dot_inverse.alphaSize() + i] = value / (glm::pi<float>() * 0.5f);
-			}
-		}
-		image.save("I_Dot_Inverse_dielectrics.exr");
-	}
 }
 
 //--------------------------------------------------------------
@@ -191,9 +146,9 @@ void ofApp::draw(){
 	ofClear(0);
 	_camera.begin();
 	ofPushMatrix();
-	ofRotateZ(90.0f);
+	ofRotateZ(90.0);
 	ofSetColor(64);
-	ofDrawGridPlane(1.0f);
+	ofDrawGridPlane(1.0);
 	ofPopMatrix();
 
 	ofPushMatrix();
@@ -207,30 +162,30 @@ void ofApp::draw(){
 	//	mesh.setMode(OF_PRIMITIVE_POINTS);
 
 	//	int N = 256;
-	//	std::vector<float> values(N);
+	//	std::vector<double> values(N);
 
-	//	rt::LinearTransform<float> transform(0, N - 1, 0, 1);
+	//	rt::LinearTransform<double> transform(0, N - 1, 0, 1);
 	//	for (int xi = 0; xi < N; ++xi) {
-	//		float alpha = transform(xi);
+	//		double alpha = transform(xi);
 
 	//		for (int zi = 0; zi < N; ++zi) {
-	//			float cosTheta = transform(zi);
+	//			double cosTheta = transform(zi);
 	//			// CoupledBRDFConductor
 	//			// CoupledBRDFDielectrics
 
-	//			//float value = (1.0 - rt::CoupledBRDFDielectrics::specularAlbedo().sample(alpha, cosTheta)) * cosTheta;
-	//			//mesh.addVertex(glm::vec3(alpha, value, cosTheta));
+	//			//double value = (1.0 - rt::CoupledBRDFDielectrics::specularAlbedo().sample(alpha, cosTheta)) * cosTheta;
+	//			//mesh.addVertex(glm::dvec3(alpha, value, cosTheta));
 
 	//			values[zi] = (1.0 - rt::CoupledBRDFConductor::specularAlbedo().sample(alpha, cosTheta)) * cosTheta;
 	//			
 	//			// values[zi] = (1.0 - rt::CoupledBRDFDielectrics::specularAlbedo().sample(alpha, cosTheta)) * cosTheta;
 	//		}
 
-	//		float maxValue = *std::max_element(values.begin(), values.end());
+	//		double maxValue = *std::max_element(values.begin(), values.end());
 
 	//		for (int zi = 0; zi < N; ++zi) {
-	//			float cosTheta = transform(zi);
-	//			mesh.addVertex(glm::vec3(alpha, values[zi], cosTheta));
+	//			double cosTheta = transform(zi);
+	//			mesh.addVertex(glm::dvec3(alpha, values[zi], cosTheta));
 	//		}
 	//	}
 
