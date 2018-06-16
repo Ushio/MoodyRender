@@ -53,7 +53,7 @@ namespace rt {
 			});
 		}
 		double sample(double alpha, double cosTheta) const {
-			return bicubic_2d(alpha, cosTheta, _alphaSize, _cosThetaSize, [&](int x, int y) {
+			return bicubic_2d<double>(alpha, cosTheta, _alphaSize, _cosThetaSize, [&](int x, int y) {
 				return get(x, y);
 			});
 		}
@@ -115,7 +115,7 @@ namespace rt {
 		}
 
 		double sample(double alpha) const {
-			return bicubic_1d(alpha, _alphaSize, [&](int x) {
+			return bicubic_1d<double>(alpha, _alphaSize, [&](int x) {
 				return get(x);
 			});
 		}
@@ -137,77 +137,6 @@ namespace rt {
 			archive(CEREAL_NVP(_alphaSize), CEREAL_NVP(_values));
 		}
 		int _alphaSize = 0;
-		std::vector<double> _values;
-	};
-
-
-	class I_Dot_Inverse {
-	public:
-		I_Dot_Inverse() {}
-
-		void save(const char *filename) {
-			std::ofstream ofs(filename);
-			{
-				cereal::XMLOutputArchive o_archive(ofs);
-				o_archive(*this);
-			}
-		}
-		void load(const char *filename) {
-			std::ifstream ifs(filename);
-			{
-				cereal::XMLInputArchive i_archive(ifs);
-				i_archive(*this);
-			}
-		}
-
-		// evaluate I_dot_inverse(alpha, u)
-		void build(int alphaSize, int uSize, std::function<double(double, double)> I_dot_inverse) {
-			_alphaSize = alphaSize;
-			_uSize = uSize;
-			_values.resize(_alphaSize * _uSize);
-
-			tbb::parallel_for(tbb::blocked_range<int>(0, _uSize), [&](const tbb::blocked_range<int> &range) {
-				for (int j = range.begin(); j < range.end(); ++j) {
-					double u = (double)j / (_uSize - 1);
-					for (int i = 0; i < _alphaSize; ++i) {
-						// alpha == 0 を回避するために i == 0 を回避する
-						double alpha = (double)std::max(i, 1) / (_alphaSize - 1);
-						double value = I_dot_inverse(1.0 - alpha, u);
-						set(i, j, value);
-					}
-
-					printf("%d line done\n", j);
-				}
-			});
-		}
-		double sample(double alpha, double u) const {
-			return bicubic_2d(alpha, u, _alphaSize, _uSize, [&](int x, int y) {
-				return get(x, y);
-			});
-		}
-		void set(int x, int y, double value) {
-			_values[y * _alphaSize + x] = value;
-		}
-		double get(int x, int y) const {
-			return _values[y * _alphaSize + x];
-		}
-		int alphaSize() const {
-			return _alphaSize;
-		}
-		int uSize() const {
-			return _uSize;
-		}
-	private:
-		friend class cereal::access;
-
-		template<class Archive>
-		void serialize(Archive & archive)
-		{
-			archive(CEREAL_NVP(_alphaSize), CEREAL_NVP(_uSize), CEREAL_NVP(_values));
-		}
-
-		int _alphaSize = 0;
-		int _uSize = 0;
 		std::vector<double> _values;
 	};
 }
