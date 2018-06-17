@@ -7,15 +7,81 @@
 		<ClCompile Include="src\main.cpp">
 			<Filter>src</Filter>
 		</ClCompile>
+		<ClCompile Include="src\main.cpp">
+			<Filter>src</Filter>
+		</ClCompile>
+		<ClCompile Include="src\ofApp.cpp">
+			<Filter>src</Filter>
+		</ClCompile>
+		<ClCompile Include="..\..\..\addons\ofxImGuiLite\src\ofxImGuiLite.cpp">
+			<Filter>addons\ofxImGuiLite\src</Filter>
+		</ClCompile>
+		<ClCompile Include="..\..\..\addons\ofxImGuiLite\libs\imgui.cpp">
+			<Filter>addons\ofxImGuiLite\libs</Filter>
+		</ClCompile>
+		<ClCompile Include="..\..\..\addons\ofxImGuiLite\libs\imgui_demo.cpp">
+			<Filter>addons\ofxImGuiLite\libs</Filter>
+		</ClCompile>
+		<ClCompile Include="..\..\..\addons\ofxImGuiLite\libs\imgui_draw.cpp">
+			<Filter>addons\ofxImGuiLite\libs</Filter>
+		</ClCompile>
+		<ClCompile Include="..\..\..\addons\ofxImGuiLite\libs\imgui_impl_glfw_gl2.cpp">
+			<Filter>addons\ofxImGuiLite\libs</Filter>
+		</ClCompile>
+		<ClCompile Include="..\..\..\addons\ofxImGuiLite\libs\imgui_impl_glfw_gl3.cpp">
+			<Filter>addons\ofxImGuiLite\libs</Filter>
+		</ClCompile>
 	</ItemGroup>
 	<ItemGroup>
 		<Filter Include="src">
 			<UniqueIdentifier>{d8376475-7454-4a24-b08a-aac121d3ad6f}</UniqueIdentifier>
 		</Filter>
+		<Filter Include="addons">
+			<UniqueIdentifier>{71834F65-F3A9-211E-73B8-DC85}</UniqueIdentifier>
+		</Filter>
+		<Filter Include="addons\ofxImGuiLite">
+			<UniqueIdentifier>{E9A39D7D-04B6-7C1F-7250-0B6E}</UniqueIdentifier>
+		</Filter>
+		<Filter Include="addons\ofxImGuiLite\src">
+			<UniqueIdentifier>{B728E3D0-76F8-4AF2-0FEF-3AFF}</UniqueIdentifier>
+		</Filter>
+		<Filter Include="addons\ofxImGuiLite\libs">
+			<UniqueIdentifier>{C2A0792E-32B7-0D9F-28BA-B0D9}</UniqueIdentifier>
+		</Filter>
 	</ItemGroup>
 	<ItemGroup>
 		<ClInclude Include="src\ofApp.h">
 			<Filter>src</Filter>
+		</ClInclude>
+		<ClInclude Include="src\ofApp.h">
+			<Filter>src</Filter>
+		</ClInclude>
+		<ClInclude Include="..\..\..\addons\ofxImGuiLite\src\ofxImGuiLite.hpp">
+			<Filter>addons\ofxImGuiLite\src</Filter>
+		</ClInclude>
+		<ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\imconfig.h">
+			<Filter>addons\ofxImGuiLite\libs</Filter>
+		</ClInclude>
+		<ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\imgui.h">
+			<Filter>addons\ofxImGuiLite\libs</Filter>
+		</ClInclude>
+		<ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\imgui_impl_glfw_gl2.h">
+			<Filter>addons\ofxImGuiLite\libs</Filter>
+		</ClInclude>
+		<ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\imgui_impl_glfw_gl3.h">
+			<Filter>addons\ofxImGuiLite\libs</Filter>
+		</ClInclude>
+		<ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\imgui_internal.h">
+			<Filter>addons\ofxImGuiLite\libs</Filter>
+		</ClInclude>
+		<ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\stb_rect_pack.h">
+			<Filter>addons\ofxImGuiLite\libs</Filter>
+		</ClInclude>
+		<ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\stb_textedit.h">
+			<Filter>addons\ofxImGuiLite\libs</Filter>
+		</ClInclude>
+		<ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\stb_truetype.h">
+			<Filter>addons\ofxImGuiLite\libs</Filter>
 		</ClInclude>
 	</ItemGroup>
 	<ItemGroup>

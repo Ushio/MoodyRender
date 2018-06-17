@@ -41,9 +41,14 @@ namespace rt {
 	}
 
 	inline double G2_v_cavity(glm::dvec3 L, glm::dvec3 V, glm::dvec3 H, glm::dvec3 N) {
-		double a = 2.0 * glm::dot(N, H) * glm::dot(N, V) / glm::dot(V, H);
-		double b = 2.0 * glm::dot(N, H) * glm::dot(N, L) / glm::dot(L, H);
+		double a = 2.0 * glm::dot(N, H) * glm::dot(N, V) / glm::max(glm::dot(V, H), 0.0);
+		double b = 2.0 * glm::dot(N, H) * glm::dot(N, L) / glm::max(glm::dot(L, H), 0.0);
 		return glm::min(glm::min(a, b), 1.0);
+	}
+
+	inline double G1_v_cavity(glm::dvec3 omega, glm::dvec3 H, glm::dvec3 N) {
+		double a = 2.0 * glm::dot(N, H) * glm::dot(N, omega) / glm::max(glm::dot(omega, H), 0.0);
+		return glm::min(a, 1.0);
 	}
 
 	//inline double G_kalemen(Vec3 L, Vec3 V, Vec3 H, Vec3 N, double alpha) {
@@ -72,13 +77,45 @@ namespace rt {
 			glm::dvec3 wi = glm::reflect(-wo, h);
 			return wi;
 		}
-
+		// 裏面はサポートしない
 		static double pdf(glm::dvec3 sampled_wi, double alpha, glm::dvec3 wo, glm::dvec3 Ng) {
 			glm::dvec3 half = glm::normalize(sampled_wi + wo);
 
 			// glm::dot(sampled_wi, half)が0になるのは、
 			// wiとwoが正反対の向き、つまりかならず裏側であるので、普段は問題にならない
 			return D_Beckmann(Ng, half, alpha) * glm::dot(Ng, half) / (4.0 * glm::dot(sampled_wi, half));
+		}
+	};
+
+	struct VCavityBeckmannVisibleNormalSampler {
+		static glm::dvec3 sample(PeseudoRandom *random, double alpha, glm::dvec3 wo, glm::dvec3 Ng) {
+			double theta = std::atan(std::sqrt(-alpha * alpha * std::log(1.0 - random->uniform())));
+			double phi = random->uniform(0.0, glm::two_pi<double>());
+			glm::dvec3 omega_m = polar_to_cartesian(theta, phi);
+			glm::dvec3 omega_m_dot = glm::dvec3(-omega_m.x, -omega_m.y, omega_m.z);
+
+			ArbitraryBRDFSpace basis(Ng);
+			glm::dvec3 wo_local = basis.globalToLocal(wo);
+
+			double visible     = glm::max(glm::dot(wo_local, omega_m),     0.0);
+			double visible_dot = glm::max(glm::dot(wo_local, omega_m_dot), 0.0);
+			double det = visible_dot / (visible + visible_dot);
+
+			//if (visible + visible_dot < 0.0000001) {
+			//	printf("");
+			//}
+			glm::dvec3 sample = random->uniform() < det ? omega_m_dot : omega_m;
+
+			glm::dvec3 h = basis.localToGlobal(sample);
+			glm::dvec3 wi = glm::reflect(-wo, h);
+			return wi;
+		}
+
+		// 裏面はサポートしない
+		static double pdf(glm::dvec3 sampled_wi, double alpha, glm::dvec3 wo, glm::dvec3 Ng) {
+			glm::dvec3 wm = glm::normalize(sampled_wi + wo);
+			double cosThetaO = glm::dot(wo, Ng);
+			return G1_v_cavity(wo, wm, Ng) * glm::max(glm::dot(wo, wm), 0.0) * D_Beckmann(Ng, wm, alpha) / (cosThetaO * (4.0 * glm::dot(sampled_wi, wm)));
 		}
 	};
 

@@ -269,6 +269,19 @@ namespace rt {
 				double pdf = m->pdf(wo, wi);
 				double cosTheta = std::abs(glm::dot(m->Ng, wi));
 
+				// MicrofacetConductorMaterial の ダメサンプルを数える
+				if (m.get<MicrofacetConductorMaterial>()) {
+					static std::atomic<int> badSample = 0;
+					static std::atomic<int> numSample = 0;
+					if (glm::dot(m->Ng, wi) < 0.0) {
+						badSample++;
+					}
+					numSample++;
+					if (numSample % 100000 == 0) {
+						printf("bad sample %.2f%%\n", (double)badSample / numSample * 100.0);
+					}
+				}
+
 				//if (i == 0) {
 				//	Lo += emission * T;
 				//}
@@ -382,7 +395,7 @@ namespace rt {
 							if (glm::isfinite(r[i]) == false) {
 								r[i] = 0.0;
 							}
-							if (r[i] < 0.0 || 100.0 < r[i]) {
+							if (r[i] < 0.0 || 1000.0 < r[i]) {
 								r[i] = 0.0;
 							}
 						}
@@ -537,7 +550,10 @@ void ofApp::draw() {
 		if (ofGetFrameNum() % 5 == 0) {
 			_image.setFromPixels(toOf(renderer->_image));
 		}
-
+		if (renderer->stepCount() == 128) {
+			_image.setFromPixels(toOf(renderer->_image));
+			_image.save("128spp.png");
+		}
 		if (renderer->stepCount() == 512) {
 			_image.setFromPixels(toOf(renderer->_image));
 			_image.save("512spp.png");

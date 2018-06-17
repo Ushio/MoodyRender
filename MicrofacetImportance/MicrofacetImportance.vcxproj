@@ -104,9 +104,8 @@
       <PreprocessorDefinitions>%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <WarningLevel>Level3</WarningLevel>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);src;..\..\..\addons\ofxImGuiLite\libs;..\..\..\addons\ofxImGuiLite\src</AdditionalIncludeDirectories>
       <CompileAs>CompileAsCpp</CompileAs>
-      <ObjectFileName>$(IntDir)/%(RelativeDir)/</ObjectFileName>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -124,9 +123,8 @@
       <PreprocessorDefinitions>%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <WarningLevel>Level3</WarningLevel>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);src;..\..\..\addons\ofxImGuiLite\libs;..\..\..\addons\ofxImGuiLite\src</AdditionalIncludeDirectories>
       <CompileAs>CompileAsCpp</CompileAs>
-      <ObjectFileName>$(IntDir)/%(RelativeDir)/</ObjectFileName>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
@@ -144,9 +142,8 @@
       <PreprocessorDefinitions>%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <WarningLevel>Level3</WarningLevel>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);src;..\..\..\addons\ofxImGuiLite\libs;..\..\..\addons\ofxImGuiLite\src</AdditionalIncludeDirectories>
       <CompileAs>CompileAsCpp</CompileAs>
-      <ObjectFileName>$(IntDir)/%(RelativeDir)/</ObjectFileName>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
@@ -167,9 +164,8 @@
       <PreprocessorDefinitions>%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <WarningLevel>Level3</WarningLevel>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);src;..\..\..\addons\ofxImGuiLite\libs;..\..\..\addons\ofxImGuiLite\src</AdditionalIncludeDirectories>
       <CompileAs>CompileAsCpp</CompileAs>
-      <ObjectFileName>$(IntDir)/%(RelativeDir)/</ObjectFileName>
     </ClCompile>
     <Link>
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
@@ -186,9 +182,24 @@
   <ItemGroup>
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\ofApp.cpp" />
+    <ClCompile Include="..\..\..\addons\ofxImGuiLite\src\ofxImGuiLite.cpp" />
+    <ClCompile Include="..\..\..\addons\ofxImGuiLite\libs\imgui.cpp" />
+    <ClCompile Include="..\..\..\addons\ofxImGuiLite\libs\imgui_demo.cpp" />
+    <ClCompile Include="..\..\..\addons\ofxImGuiLite\libs\imgui_draw.cpp" />
+    <ClCompile Include="..\..\..\addons\ofxImGuiLite\libs\imgui_impl_glfw_gl2.cpp" />
+    <ClCompile Include="..\..\..\addons\ofxImGuiLite\libs\imgui_impl_glfw_gl3.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\ofApp.h" />
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\src\ofxImGuiLite.hpp" />
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\imconfig.h" />
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\imgui.h" />
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\imgui_impl_glfw_gl2.h" />
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\imgui_impl_glfw_gl3.h" />
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\imgui_internal.h" />
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\stb_rect_pack.h" />
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\stb_textedit.h" />
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\stb_truetype.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="$(OF_ROOT)\libs\openFrameworksCompiled\project\vs\openframeworksLib.vcxproj">

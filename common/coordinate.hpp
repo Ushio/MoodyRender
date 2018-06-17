@@ -32,7 +32,27 @@ namespace rt {
 			orthonormalBasis(zAxis, &xaxis, &yaxis);
 		}
 		glm::dvec3 localToGlobal(const glm::dvec3 v) const {
+			/*
+			matrix
+			xaxis.x, yaxis.x, zaxis.x
+			xaxis.y, yaxis.y, zaxis.y
+			xaxis.z, yaxis.z, zaxis.z
+			*/
 			return v.x * xaxis + v.y * yaxis + v.z * zaxis;
+		}
+		glm::dvec3 globalToLocal(const glm::dvec3 v) const {
+			/*
+			matrix
+			xaxis.x, xaxis.y, xaxis.z
+			yaxis.x, yaxis.y, yaxis.z
+			zaxis.x, zaxis.y, zaxis.z
+			*/
+			return 
+				v.x * glm::dvec3(xaxis.x, yaxis.x, zaxis.x)
+				+ 
+				v.y * glm::dvec3(xaxis.y, yaxis.y, zaxis.y)
+				+ 
+				v.z * glm::dvec3(xaxis.z, yaxis.z, zaxis.z);
 		}
 
 		// axis on global space
