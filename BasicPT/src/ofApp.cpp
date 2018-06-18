@@ -263,6 +263,14 @@ namespace rt {
 				//		}
 				//	}
 				//}
+
+				// 後ほど対応は考えないとなぁ
+				// おそらく隙間からだろう
+				if (glm::dot(wo, m->Ng) < 0.0)
+				{
+					m->Ng = -m->Ng;
+				}
+
 				glm::dvec3 wi = m->sample(random, wo);
 				glm::dvec3 bxdf = m->bxdf(wo, wi);
 				glm::dvec3 emission = m->emission(wo);
@@ -270,17 +278,17 @@ namespace rt {
 				double cosTheta = std::abs(glm::dot(m->Ng, wi));
 
 				// MicrofacetConductorMaterial の ダメサンプルを数える
-				if (m.get<MicrofacetConductorMaterial>()) {
-					static std::atomic<int> badSample = 0;
-					static std::atomic<int> numSample = 0;
-					if (glm::dot(m->Ng, wi) < 0.0) {
-						badSample++;
-					}
-					numSample++;
-					if (numSample % 100000 == 0) {
-						printf("bad sample %.2f%%\n", (double)badSample / numSample * 100.0);
-					}
-				}
+				//if (m.get<MicrofacetConductorMaterial>()) {
+				//	static std::atomic<int> badSample = 0;
+				//	static std::atomic<int> numSample = 0;
+				//	if (glm::dot(m->Ng, wi) < 0.0) {
+				//		badSample++;
+				//	}
+				//	numSample++;
+				//	if (numSample % 100000 == 0) {
+				//		printf("bad sample %.2f%%\n", (double)badSample / numSample * 100.0);
+				//	}
+				//}
 
 				//if (i == 0) {
 				//	Lo += emission * T;

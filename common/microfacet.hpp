@@ -101,9 +101,6 @@ namespace rt {
 			double visible_dot = glm::max(glm::dot(wo_local, omega_m_dot), 0.0);
 			double det = visible_dot / (visible + visible_dot);
 
-			//if (visible + visible_dot < 0.0000001) {
-			//	printf("");
-			//}
 			glm::dvec3 sample = random->uniform() < det ? omega_m_dot : omega_m;
 
 			glm::dvec3 h = basis.localToGlobal(sample);

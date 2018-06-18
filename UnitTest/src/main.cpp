@@ -15,6 +15,7 @@
 #include "microfacet.hpp"
 #include "serializable_buffer.hpp"
 #include "material.hpp"
+#include "geometry.hpp"
 
 TEST_CASE("online", "[online]") {
 	SECTION("online") {
@@ -404,7 +405,36 @@ TEST_CASE("microfacet", "[microfacet]") {
 	}
 }
 
+// 
 
+TEST_CASE("ArbitraryBRDFSpace", "[ArbitraryBRDFSpace]") {
+	using namespace rt;
+
+
+	SECTION("ArbitraryBRDFSpace") {
+		rt::Xor64 *random = new rt::Xor64();
+		for (int j = 0; j < 1000000; ++j) {
+			auto zAxis = uniform_on_unit_sphere(random);
+			ArbitraryBRDFSpace space(zAxis);
+
+			REQUIRE(glm::abs(glm::dot(space.xaxis, space.yaxis)) < 1.0e-15);
+			REQUIRE(glm::abs(glm::dot(space.yaxis, space.zaxis)) < 1.0e-15);
+			REQUIRE(glm::abs(glm::dot(space.zaxis, space.xaxis)) < 1.0e-15);
+
+			glm::dvec3 maybe_zaxis = glm::cross(space.xaxis, space.yaxis);
+			for (int j = 0; j < 3; ++j) {
+				REQUIRE(glm::abs(space.zaxis[j] - maybe_zaxis[j]) < 1.0e-15);
+			}
+
+			auto anyvector = uniform_on_unit_sphere(random);
+			auto samevector = space.localToGlobal(space.globalToLocal(anyvector));
+
+			for (int j = 0; j < 3; ++j) {
+				REQUIRE(glm::abs(anyvector[j] - samevector[j]) < 1.0e-15);
+			}
+		}
+	}
+}
 
 int main(int argc, char* const argv[])
 {
@@ -412,7 +442,8 @@ int main(int argc, char* const argv[])
 	// テストを指定する場合
 	char* custom_argv[] = {
 		"",
-		"[microfacet sampling]"
+		//"[microfacet sampling]"
+		"[ArbitraryBRDFSpace]"
 		//"[microfacet]"
 	};
 	Catch::Session().run(sizeof(custom_argv) / sizeof(custom_argv[0]), custom_argv);

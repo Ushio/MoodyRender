@@ -36,4 +36,18 @@ namespace rt {
 		s.beta = glm::max(eps1, eps2);
 		return s;
 	}
+
+	inline glm::dvec3 uniform_on_unit_sphere(PeseudoRandom *random) {
+		glm::dvec3 d;
+		double sq = 0.0;
+		do {
+			d.x = random->uniform(-1.0, 1.0);
+			d.y = random->uniform(-1.0, 1.0);
+			d.z = random->uniform(-1.0, 1.0);
+
+			sq = glm::length2(d);
+		} while (sq < 0.0001 || 1.0 < sq);
+		d /= glm::sqrt(sq);
+		return d;
+	}
 }
