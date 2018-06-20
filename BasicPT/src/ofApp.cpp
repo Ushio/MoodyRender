@@ -74,6 +74,15 @@ namespace rt {
 				}
 			}
 			_emissionSampler = ValueProportionalSampler<double>(_emissivePrimitives, [](const EmissivePrimitiveRef& ref) { return ref.area; });
+		
+			RTCBounds bounds;
+			rtcGetSceneBounds(_embreeScene, &bounds);
+
+			float maxWide = bounds.upper_x - bounds.lower_x;
+			maxWide = std::max(maxWide, bounds.upper_y - bounds.lower_y);
+			maxWide = std::max(maxWide, bounds.upper_z - bounds.lower_z);
+			_sceneAdaptiveEps = maxWide * 1.0e-4;
+			// printf("_sceneAdaptiveEps %.10f\n", _sceneAdaptiveEps);
 		}
 		~SceneInterface() {
 			rtcReleaseScene(_embreeScene);
@@ -82,10 +91,12 @@ namespace rt {
 		SceneInterface(const SceneInterface &) = delete;
 		void operator=(const SceneInterface &) = delete;
 
-		bool occluded(const glm::dvec3 &p, const glm::dvec3 &q, float bias = 1.0e-5f) const {
+		float adaptiveEps() const {
+			return _sceneAdaptiveEps;
+		}
+
+		bool occluded(const glm::dvec3 &p, const glm::dvec3 &q, float bias) const {
 			glm::dvec3 rd = q - p;
-			//double d = glm::distance(p, q);
-			//glm::dvec3 rd = (q - p) / d;
 
 			RTCRay ray;
 			ray.org_x = p.x;
@@ -110,7 +121,7 @@ namespace rt {
 			return ray.tfar != tfar;
 		}
 
-		bool intersect(const glm::dvec3 &ro, const glm::dvec3 &rd, double tnear, Material *material, double *tmin) const {
+		bool intersect(const glm::dvec3 &ro, const glm::dvec3 &rd, float tnear, Material *material, float *tmin) const {
 			RTCRayHit rayhit;
 			rayhit.ray.org_x = ro.x;
 			rayhit.ray.org_y = ro.y;
@@ -120,7 +131,7 @@ namespace rt {
 			rayhit.ray.dir_z = rd.z;
 			rayhit.ray.time = 0.0f;
 
-			rayhit.ray.tfar = (float)*tmin;
+			rayhit.ray.tfar = FLT_MAX;
 			rayhit.ray.tnear = tnear;
 
 			rayhit.ray.mask = 0;
@@ -179,6 +190,8 @@ namespace rt {
 		};
 		std::vector<EmissivePrimitiveRef> _emissivePrimitives;
 		ValueProportionalSampler<double> _emissionSampler;
+
+		float _sceneAdaptiveEps = 0.0f;
 	};
 
 	class Image {
@@ -186,7 +199,7 @@ namespace rt {
 		Image(int w, int h) :_w(w), _h(h), _pixels(h*w) {
 			for (int i = 0; i < _pixels.size(); ++i) {
 				_pixels[i].random = Xor64(i + 1);
-				for (int j = 0; j < 100; ++j) {
+				for (int j = 0; j < 1024; ++j) {
 					_pixels[i].random.generate();
 				}
 			}
@@ -230,45 +243,45 @@ namespace rt {
 		glm::dvec3 T(1.0);
 		for (int i = 0; i < 10; ++i) {
 			Material m;
-			double tmin = std::numeric_limits<double>::max();
+			float tmin = 0.0f;
 			glm::dvec3 wo = -rd;
 
-			if (scene.intersect(ro, rd, 0.00001, &m, &tmin)) {
-				//{
-				//	glm::dvec3 p = ro + rd * tmin;
-
-				//	glm::dvec3 q;
-				//	Material sampledM;
-				//	scene.sampleEmissiveUniform(random, &q, &sampledM);
-
-				//	glm::dvec3 wi = glm::normalize(q - p);
-				//	glm::dvec3 emission = bxdf_emission(sampledM, -wi);
-
-				//	glm::dvec3 bxdf = bxdf_evaluate(m, wo, wi);
-				//	double pdf_area = (1.0 / scene.emissiveArea());
-
-				//	double cosTheta = glm::dot(bxdf_Ng(m), wi);
-
-				//	double cosThetaP = glm::abs(glm::dot(bxdf_Ng(m), wi));
-				//	double cosThetaQ = glm::dot(bxdf_Ng(sampledM), -wi);
-
-				//	double g = GTerm(p, cosThetaP, q, cosThetaQ);
-
-				//	glm::dvec3 contribution = T * bxdf * emission * g;
-
-				//	/* 裏面は発光しない */
-				//	if (0.0 < cosThetaQ && glm::any(glm::greaterThanEqual(contribution, glm::dvec3(glm::epsilon<double>())))) {
-				//		if (scene.occluded(p, q) == false) {
-				//			Lo += contribution / pdf_area;
-				//		}
-				//	}
-				//}
-
+			if (scene.intersect(ro, rd, scene.adaptiveEps(), &m, &tmin)) {
 				// 後ほど対応は考えないとなぁ
 				// おそらく隙間からだろう
 				if (glm::dot(wo, m->Ng) < 0.0)
 				{
 					m->Ng = -m->Ng;
+				}
+
+				{
+					glm::dvec3 p = ro + rd * (double)tmin;
+
+					glm::dvec3 q;
+					Material sampledM;
+					scene.sampleEmissiveUniform(random, &q, &sampledM);
+
+					glm::dvec3 wi = glm::normalize(q - p);
+					glm::dvec3 emission = sampledM->emission(-wi);
+
+					glm::dvec3 bxdf = m->bxdf(wo, wi);
+					double pdf_area = (1.0 / scene.emissiveArea());
+
+					double cosTheta = glm::dot(m->Ng, wi);
+
+					double cosThetaP = glm::abs(glm::dot(m->Ng, wi));
+					double cosThetaQ = glm::dot(sampledM->Ng, -wi);
+
+					double g = GTerm(p, cosThetaP, q, cosThetaQ);
+
+					glm::dvec3 contribution = T * bxdf * emission * g;
+
+					/* 裏面は発光しない */
+					if (0.0 < cosThetaQ && glm::any(glm::greaterThanEqual(contribution, glm::dvec3(glm::epsilon<double>())))) {
+						if (scene.occluded(p, q, scene.adaptiveEps()) == false) {
+							Lo += contribution / pdf_area;
+						}
+					}
 				}
 
 				glm::dvec3 wi = m->sample(random, wo);
@@ -290,10 +303,10 @@ namespace rt {
 				//	}
 				//}
 
-				//if (i == 0) {
-				//	Lo += emission * T;
-				//}
-				Lo += emission * T;
+				if (i == 0) {
+					Lo += emission * T;
+				}
+				// Lo += emission * T;
 
 				if (glm::any(glm::greaterThanEqual(bxdf, glm::dvec3(1.0e-6f)))) {
 					T *= bxdf * cosTheta / pdf;
@@ -302,7 +315,7 @@ namespace rt {
 					break;
 				}
 
-				ro = (ro + rd * tmin);
+				ro = (ro + rd * (double)tmin);
 				rd = wi;
 			}
 			else {
@@ -447,15 +460,29 @@ inline ofPixels toOf(const rt::Image &image) {
 	}
 	return pixels;
 }
+inline ofFloatPixels toOfLinear(const rt::Image &image) {
+	ofFloatPixels pixels;
+	pixels.allocate(image.width(), image.height(), OF_IMAGE_COLOR);
+	float *dst = pixels.getPixels();
 
+	for (int y = 0; y < image.height(); ++y) {
+		for (int x = 0; x < image.width(); ++x) {
+			int index = y * image.width() + x;
+			const auto &px = *image.pixel(x, y);
+			auto L = px.color / (double)px.sample;
+			dst[index * 3 + 0] = L[0];
+			dst[index * 3 + 1] = L[1];
+			dst[index * 3 + 2] = L[2];
+		}
+	}
+	return pixels;
+}
 
 std::shared_ptr<rt::Scene> scene;
 std::shared_ptr<rt::PTRenderer> renderer;
 
 //--------------------------------------------------------------
-void ofApp::setup(){
-	
-
+void ofApp::setup() {
 	_MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
 	_MM_SET_DENORMALS_ZERO_MODE(_MM_DENORMALS_ZERO_ON);
 
@@ -466,8 +493,8 @@ void ofApp::setup(){
 	_camera.setDistance(5.0);
 
 	scene = std::shared_ptr<rt::Scene>(new rt::Scene());
-	rt::loadFromABC(ofToDataPath("cornelbox.abc").c_str(), *scene);
 	// rt::loadFromABC(ofToDataPath("cornelbox.abc").c_str(), *scene);
+	rt::loadFromABC(ofToDataPath("mitsuba.abc").c_str(), *scene);
 
 	renderer = std::shared_ptr<rt::PTRenderer>(new rt::PTRenderer(scene));
 
@@ -537,10 +564,10 @@ void ofApp::draw() {
 		scene->camera.sampleRay(&random, x, y, &o, &d);
 
 		rt::Material m;
-		double tmin = std::numeric_limits<double>::max();
+		float tmin = 0.0f;
 		if (renderer->sceneInterface().intersect(o, d, 0.0, &m, &tmin)) {
 			ofSetColor(255, 0, 0);
-			auto p = o + d * tmin;
+			auto p = o + d * (double)tmin;
 			ofDrawLine(o.x, o.y, o.z, p.x, p.y, p.z);
 			
 			auto pn = p + m->Ng * 0.1;
@@ -626,9 +653,13 @@ void ofApp::keyPressed(int key) {
 		_showImage = !_showImage;
 	}
 
+	//if (key == 's') {
+	//	_image.save("pt.png");
+	//	ofFloatImage img(_image);
+	//}
 	if (key == 's') {
-		_image.save("pt.png");
-		ofFloatImage img(_image);
+		ofFloatImage image = toOfLinear(renderer->_image);
+		image.save("pt.exr");
 	}
 }
 
