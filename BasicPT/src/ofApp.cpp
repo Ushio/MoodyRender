@@ -254,35 +254,35 @@ namespace rt {
 					m->Ng = -m->Ng;
 				}
 
-				{
-					glm::dvec3 p = ro + rd * (double)tmin;
+				//{
+				//	glm::dvec3 p = ro + rd * (double)tmin;
 
-					glm::dvec3 q;
-					Material sampledM;
-					scene.sampleEmissiveUniform(random, &q, &sampledM);
+				//	glm::dvec3 q;
+				//	Material sampledM;
+				//	scene.sampleEmissiveUniform(random, &q, &sampledM);
 
-					glm::dvec3 wi = glm::normalize(q - p);
-					glm::dvec3 emission = sampledM->emission(-wi);
+				//	glm::dvec3 wi = glm::normalize(q - p);
+				//	glm::dvec3 emission = sampledM->emission(-wi);
 
-					glm::dvec3 bxdf = m->bxdf(wo, wi);
-					double pdf_area = (1.0 / scene.emissiveArea());
+				//	glm::dvec3 bxdf = m->bxdf(wo, wi);
+				//	double pdf_area = (1.0 / scene.emissiveArea());
 
-					double cosTheta = glm::dot(m->Ng, wi);
+				//	double cosTheta = glm::dot(m->Ng, wi);
 
-					double cosThetaP = glm::abs(glm::dot(m->Ng, wi));
-					double cosThetaQ = glm::dot(sampledM->Ng, -wi);
+				//	double cosThetaP = glm::abs(glm::dot(m->Ng, wi));
+				//	double cosThetaQ = glm::dot(sampledM->Ng, -wi);
 
-					double g = GTerm(p, cosThetaP, q, cosThetaQ);
+				//	double g = GTerm(p, cosThetaP, q, cosThetaQ);
 
-					glm::dvec3 contribution = T * bxdf * emission * g;
+				//	glm::dvec3 contribution = T * bxdf * emission * g;
 
-					/* 裏面は発光しない */
-					if (0.0 < cosThetaQ && glm::any(glm::greaterThanEqual(contribution, glm::dvec3(glm::epsilon<double>())))) {
-						if (scene.occluded(p, q, scene.adaptiveEps()) == false) {
-							Lo += contribution / pdf_area;
-						}
-					}
-				}
+				//	/* 裏面は発光しない */
+				//	if (0.0 < cosThetaQ && glm::any(glm::greaterThanEqual(contribution, glm::dvec3(glm::epsilon<double>())))) {
+				//		if (scene.occluded(p, q, scene.adaptiveEps()) == false) {
+				//			Lo += contribution / pdf_area;
+				//		}
+				//	}
+				//}
 
 				glm::dvec3 wi = m->sample(random, wo);
 				glm::dvec3 bxdf = m->bxdf(wo, wi);
@@ -303,10 +303,10 @@ namespace rt {
 				//	}
 				//}
 
-				if (i == 0) {
-					Lo += emission * T;
-				}
-				// Lo += emission * T;
+				//if (i == 0) {
+				//	Lo += emission * T;
+				//}
+				Lo += emission * T;
 
 				if (glm::any(glm::greaterThanEqual(bxdf, glm::dvec3(1.0e-6f)))) {
 					T *= bxdf * cosTheta / pdf;
@@ -493,8 +493,8 @@ void ofApp::setup() {
 	_camera.setDistance(5.0);
 
 	scene = std::shared_ptr<rt::Scene>(new rt::Scene());
-	// rt::loadFromABC(ofToDataPath("cornelbox.abc").c_str(), *scene);
-	rt::loadFromABC(ofToDataPath("mitsuba.abc").c_str(), *scene);
+	rt::loadFromABC(ofToDataPath("cornelbox.abc").c_str(), *scene);
+	// rt::loadFromABC(ofToDataPath("mitsuba.abc").c_str(), *scene);
 
 	renderer = std::shared_ptr<rt::PTRenderer>(new rt::PTRenderer(scene));
 
