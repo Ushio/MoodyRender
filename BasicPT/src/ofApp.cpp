@@ -6,6 +6,7 @@
 #include "value_prportional_sampler.hpp"
 #include "geometry.hpp"
 
+#include <random>
 #include <xmmintrin.h>
 #include <pmmintrin.h>
 #include <tbb/tbb.h>
@@ -199,11 +200,9 @@ namespace rt {
 	class Image {
 	public:
 		Image(int w, int h) :_w(w), _h(h), _pixels(h*w) {
+			std::mt19937 engine(632431);
 			for (int i = 0; i < _pixels.size(); ++i) {
-				_pixels[i].random = Xor64(i + 1);
-				for (int j = 0; j < 1024; ++j) {
-					_pixels[i].random.generate();
-				}
+				_pixels[i].random = Xor64(engine());
 			}
 		}
 		int width() const {
