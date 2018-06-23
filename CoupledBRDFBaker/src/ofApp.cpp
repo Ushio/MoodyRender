@@ -22,12 +22,15 @@ inline void bake(std::string name, bool include_fresnel_dielectrics) {
 
 		OnlineMean<double> mean;
 		for (int i = 0; i < SampleCount; ++i) {
-			glm::dvec3 wi = BeckmannImportanceSampler::sample(&random, alpha, wo, Ng);
-			double pdf_omega = BeckmannImportanceSampler::pdf(wi, alpha, wo, Ng);
+			//glm::dvec3 wi = BeckmannImportanceSampler::sample(&random, alpha, wo, Ng);
+			//double pdf_omega = BeckmannImportanceSampler::pdf(wi, alpha, wo, Ng);
+			glm::dvec3 wi = VCavityBeckmannVisibleNormalSampler::sample(&random, alpha, wo, Ng);
+			double pdf_omega = VCavityBeckmannVisibleNormalSampler::pdf(wi, alpha, wo, Ng);
 
 			glm::dvec3 h = glm::normalize(wi + wo);
 			double d = D_Beckmann(Ng, h, alpha);
-			double g = G2_height_correlated_beckmann(wi, wo, h, Ng, alpha);
+			double g = G2_v_cavity(wo, wi, h, Ng);
+			// double g = G2_height_correlated_beckmann(wi, wo, h, Ng, alpha);
 
 			double cos_term_wo = glm::dot(Ng, wo);
 			double cos_term_wi = glm::dot(Ng, wi);
@@ -54,7 +57,7 @@ inline void bake(std::string name, bool include_fresnel_dielectrics) {
 		}
 		return mean.mean();
 	});
-	albedo.saveXML(ofToDataPath(name + ".xml").c_str());
+	saveAsBinary(albedo, ofToDataPath(name + ".bin").c_str());
 
 	// preview
 	ofFloatImage image;
@@ -72,16 +75,16 @@ inline void bake(std::string name, bool include_fresnel_dielectrics) {
 // 両方拡張子を含む
 void bake_avg(const char *albedoFile, const char *dstName) {
 	rt::SpecularAlbedo albedo;
-	albedo.load(ofToDataPath(albedoFile).c_str());
+	loadFromBinary(albedo, ofToDataPath(albedoFile).c_str());
 	
 	rt::SpecularAvgAlbedo avg;
 	avg.build(256, [&](double alpha) {
 		return 2.0 * rt::composite_simpson<double>([&](double theta) {
 			double cosTheta = cos(theta);
 			return albedo.sample(alpha, cosTheta) * cosTheta * sin(theta);
-		}, 128, 0.0, glm::pi<double>() * 0.5);
+		}, 256, 0.0, glm::pi<double>() * 0.5);
 	});
-	avg.save(ofToDataPath(dstName).c_str());
+	saveAsBinary(avg, ofToDataPath(dstName).c_str());
 }
 
 
@@ -92,8 +95,8 @@ void ofApp::setup() {
 	 //bake("albedo_specular_dielectrics", true);
 	 //printf("done %f seconds\n", sw.elapsed());
 
-	 //bake_avg("albedo_specular_conductor.xml", "albedo_specular_conductor_avg.xml");
-	 //bake_avg("albedo_specular_dielectrics.xml", "albedo_specular_dielectrics_avg.xml");
+	 bake_avg("albedo_specular_conductor.bin", "albedo_specular_conductor_avg.bin");
+	 bake_avg("albedo_specular_dielectrics.bin", "albedo_specular_dielectrics_avg.bin");
 
 	ofSetVerticalSync(false);
 
@@ -101,8 +104,8 @@ void ofApp::setup() {
 	_camera.setFarClip(100.0);
 	_camera.setDistance(5.0);
 
-	rt::CoupledBRDFConductor::load(ofToDataPath("albedo_specular_conductor.xml").c_str(), ofToDataPath("albedo_specular_conductor_avg.xml").c_str());
-	rt::CoupledBRDFDielectrics::load(ofToDataPath("albedo_specular_dielectrics.xml").c_str(), ofToDataPath("albedo_specular_dielectrics_avg.xml").c_str());
+	// rt::CoupledBRDFConductor::load(ofToDataPath("albedo_specular_conductor.xml").c_str(), ofToDataPath("albedo_specular_conductor_avg.xml").c_str());
+	// rt::CoupledBRDFDielectrics::load(ofToDataPath("albedo_specular_dielectrics.xml").c_str(), ofToDataPath("albedo_specular_dielectrics_avg.xml").c_str());
 }
 
 //--------------------------------------------------------------

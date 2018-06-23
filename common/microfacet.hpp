@@ -89,8 +89,9 @@ namespace rt {
 
 	struct VCavityBeckmannVisibleNormalSampler {
 		static glm::dvec3 sample(PeseudoRandom *random, double alpha, glm::dvec3 wo, glm::dvec3 Ng) {
-			double theta = std::atan(std::sqrt(-alpha * alpha * std::log(1.0 - random->uniform())));
 			double phi = random->uniform(0.0, glm::two_pi<double>());
+
+			double theta = std::atan(std::sqrt(-alpha * alpha * std::log(random->uniform())));
 			glm::dvec3 omega_m = polar_to_cartesian(theta, phi);
 			glm::dvec3 omega_m_dot = glm::dvec3(-omega_m.x, -omega_m.y, omega_m.z);
 
@@ -248,9 +249,9 @@ namespace rt {
 			return s_sampler;
 		}
 
-		static void load(const char *specularAlbedoXML, const char *specularAvgAlbedoXML) {
-			specularAlbedo().load(specularAlbedoXML);
-			specularAvgAlbedo().load(specularAvgAlbedoXML);
+		static void load(const char *specularAlbedoBin, const char *specularAvgAlbedoBin) {
+			loadFromBinary(specularAlbedo(), specularAlbedoBin);
+			loadFromBinary(specularAvgAlbedo(), specularAvgAlbedoBin);
 			sampler().build([](double alpha, double cosTheta) {
 				return rt::CoupledBRDFConductor::specularAlbedo().sample(alpha, cosTheta);
 			});
@@ -270,9 +271,9 @@ namespace rt {
 			static CoupledBRDFSampler s_sampler;
 			return s_sampler;
 		}
-		static void load(const char *specularAlbedoXML, const char *specularAvgAlbedoXML) {
-			specularAlbedo().load(specularAlbedoXML);
-			specularAvgAlbedo().load(specularAvgAlbedoXML);
+		static void load(const char *specularAlbedoBin, const char *specularAvgAlbedoBin) {
+			loadFromBinary(specularAlbedo(), specularAlbedoBin);
+			loadFromBinary(specularAvgAlbedo(), specularAvgAlbedoBin);
 			sampler().build([](double alpha, double cosTheta) {
 				return rt::CoupledBRDFDielectrics::specularAlbedo().sample(alpha, cosTheta);
 			});

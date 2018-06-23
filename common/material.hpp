@@ -164,7 +164,8 @@ namespace rt {
 
 			glm::dvec3 h = glm::normalize(wi + wo);
 			double d = D_Beckmann(Ng, h, alpha);
-			double g = G2_height_correlated_beckmann(wi, wo, h, Ng, alpha);
+			// double g = G2_height_correlated_beckmann(wi, wo, h, Ng, alpha);
+			double g = G2_v_cavity(wi, wo, h, Ng);
 
 			double brdf_without_f = d * g / (4.0 * cos_term_wo * cos_term_wi);
 
@@ -200,18 +201,13 @@ namespace rt {
 
 			return brdf_spec + brdf_diff;
 		}
-#define USE_VISIBLE_NORMAL 1
 
 		glm::dvec3 sample(PeseudoRandom *random, const glm::dvec3 &wo) const override {
 			glm::dvec3 wi;
 			double spAlbedo = CoupledBRDFConductor::specularAlbedo().sample(alpha, glm::dot(Ng, wo));
 
 			if (random->uniform() < spAlbedo) {
-#if USE_VISIBLE_NORMAL 
 				wi = VCavityBeckmannVisibleNormalSampler::sample(random, alpha, wo, Ng);
-#else
-				wi = BeckmannImportanceSampler::sample(random, alpha, wo, Ng);
-#endif
 			}
 			else {
 				double theta = CoupledBRDFConductor::sampler().sampleTheta(alpha, random);
@@ -228,18 +224,12 @@ namespace rt {
 
 			double spAlbedo = CoupledBRDFConductor::specularAlbedo().sample(alpha, glm::dot(Ng, wo));
 			double pdf_omega =
-#if USE_VISIBLE_NORMAL 
 				spAlbedo * VCavityBeckmannVisibleNormalSampler::pdf(sampled_wi, alpha, wo, Ng)
-#else
-				spAlbedo * BeckmannImportanceSampler::pdf(sampled_wi, alpha, wo, Ng)
-#endif
 				+
 				(1.0 - spAlbedo) * (1.0 / glm::two_pi<double>()) * (sampler.thetaSize(alpha) * (2.0 / glm::pi<double>())) * sampler.probability(alpha, theta) / std::sin(theta);
 				// (1.0 - spAlbedo) * LambertianSampler::pdf(sampled_wi, Ng);
 			return pdf_omega;
 		}
-
-#undef USE_VISIBLE_NORMAL
 	};
 	
 	class MicrofacetCoupledDielectricsMaterial : public IMaterial {
@@ -258,7 +248,8 @@ namespace rt {
 
 			glm::dvec3 h = glm::normalize(wi + wo);
 			double d = D_Beckmann(Ng, h, alpha);
-			double g = G2_height_correlated_beckmann(wi, wo, h, Ng, alpha);
+			// double g = G2_height_correlated_beckmann(wi, wo, h, Ng, alpha);
+			double g = G2_v_cavity(wi, wo, h, Ng);
 
 			double brdf_without_f = d * g / (4.0 * cos_term_wo * cos_term_wi);
 
@@ -285,7 +276,7 @@ namespace rt {
 			double spAlbedo = CoupledBRDFDielectrics::specularAlbedo().sample(alpha, glm::dot(Ng, wo));
 
 			if (random->uniform() < spAlbedo) {
-				wi = BeckmannImportanceSampler::sample(random, alpha, wo, Ng);
+				wi = VCavityBeckmannVisibleNormalSampler::sample(random, alpha, wo, Ng);
 			}
 			else {
 				double theta = CoupledBRDFDielectrics::sampler().sampleTheta(alpha, random);
@@ -302,7 +293,7 @@ namespace rt {
 
 			double spAlbedo = CoupledBRDFDielectrics::specularAlbedo().sample(alpha, glm::dot(Ng, wo));
 			double pdf_omega =
-				spAlbedo * BeckmannImportanceSampler::pdf(sampled_wi, alpha, wo, Ng)
+				spAlbedo * VCavityBeckmannVisibleNormalSampler::pdf(sampled_wi, alpha, wo, Ng)
 				+
 				(1.0 - spAlbedo) * (1.0 / glm::two_pi<double>()) * (sampler.thetaSize(alpha) * (2.0 / glm::pi<double>())) * sampler.probability(alpha, theta) / std::sin(theta);
 			// (1.0 - spAlbedo) * LambertianSampler::pdf(sampled_wi, Ng);

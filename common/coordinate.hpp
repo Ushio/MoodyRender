@@ -14,6 +14,14 @@ namespace rt {
 		};
 		return v;
 	};
+	inline glm::dvec3 polar_to_cartesian(double cosTheta, double sinTheta, double phi) {
+		glm::dvec3 v = {
+			sinTheta * std::cos(phi),
+			sinTheta * std::sin(phi),
+			cosTheta
+		};
+		return v;
+	};
 
 	// Building an Orthonormal Basis, Revisited
 	template <typename Real, glm::precision P>

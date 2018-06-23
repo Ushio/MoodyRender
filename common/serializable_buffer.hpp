@@ -14,38 +14,26 @@
 #include "bicubic.hpp"
 
 namespace rt {
+	template <class T>
+	inline void saveAsBinary(const T &value, const char *filename) {
+		std::ofstream ofs(filename, std::ios::binary);
+		{
+			cereal::PortableBinaryOutputArchive o_archive(ofs);
+			o_archive(value);
+		}
+	}
+	template <class T>
+	inline void loadFromBinary(T &value, const char *filename) {
+		std::ifstream ifs(filename, std::ios::binary);
+		{
+			cereal::PortableBinaryInputArchive i_archive(ifs);
+			i_archive(value);
+		}
+	}
+
 	class SpecularAlbedo {
 	public:
 		SpecularAlbedo() {}
-
-		void saveXML(const char *filename) const {
-			std::ofstream ofs(filename);
-			{
-				cereal::XMLOutputArchive o_archive(ofs);
-				o_archive(*this);
-			}
-		}
-		void saveBinary(const char *filename) const {
-			std::ofstream ofs(filename, std::ios::binary);
-			{
-				cereal::PortableBinaryOutputArchive o_archive(ofs);
-				o_archive(*this);
-			}
-		}
-		void load(const char *filename) {
-			std::ifstream ifs(filename);
-			{
-				cereal::XMLInputArchive i_archive(ifs);
-				i_archive(*this);
-			}
-		}
-		void loadBinary(const char *filename) {
-			std::ifstream ifs(filename);
-			{
-				cereal::PortableBinaryInputArchive i_archive(ifs);
-				i_archive(*this);
-			}
-		}
 
 		// evaluate(alpha, cosTheta)
 		void build(int alphaSize, int cosThetaSize, std::function<double(double, double)> evaluate) {
@@ -101,21 +89,6 @@ namespace rt {
 	class SpecularAvgAlbedo {
 	public:
 		SpecularAvgAlbedo() {}
-
-		void save(const char *filename) {
-			std::ofstream ofs(filename);
-			{
-				cereal::XMLOutputArchive o_archive(ofs);
-				o_archive(*this);
-			}
-		}
-		void load(const char *filename) {
-			std::ifstream ifs(filename);
-			{
-				cereal::XMLInputArchive i_archive(ifs);
-				i_archive(*this);
-			}
-		}
 
 		// evaluate(alpha)
 		void build(int alphaSize, std::function<double(double)> evaluate) {

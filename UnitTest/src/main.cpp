@@ -153,13 +153,12 @@ TEST_CASE("LambertianMaterial", "[LambertianMaterial]") {
 
 TEST_CASE("microfacet sampling", "[microfacet sampling]") {
 	rt::CoupledBRDFConductor::load(
-		ofToDataPath("baked/albedo_specular_conductor.xml").c_str(),
-		ofToDataPath("baked/albedo_specular_conductor_avg.xml").c_str());
+		ofToDataPath("baked/albedo_specular_conductor.bin").c_str(),
+		ofToDataPath("baked/albedo_specular_conductor_avg.bin").c_str());
 	rt::CoupledBRDFDielectrics::load(
-		ofToDataPath("baked/albedo_specular_dielectrics.xml").c_str(),
-		ofToDataPath("baked/albedo_specular_dielectrics_avg.xml").c_str());
+		ofToDataPath("baked/albedo_specular_dielectrics.bin").c_str(),
+		ofToDataPath("baked/albedo_specular_dielectrics_avg.bin").c_str());
 
-	// マクロを使って無理やりテストしている。あとで整理する
 	SECTION("white furnance test by v cavity beckmann visible normal") {
 		using namespace rt;
 
@@ -208,11 +207,11 @@ TEST_CASE("microfacet sampling", "[microfacet sampling]") {
 
 TEST_CASE("microfacet", "[microfacet]") {
 	rt::CoupledBRDFConductor::load(
-		ofToDataPath("baked/albedo_specular_conductor.xml").c_str(),
-		ofToDataPath("baked/albedo_specular_conductor_avg.xml").c_str());
+		ofToDataPath("baked/albedo_specular_conductor.bin").c_str(),
+		ofToDataPath("baked/albedo_specular_conductor_avg.bin").c_str());
 	rt::CoupledBRDFDielectrics::load(
-		ofToDataPath("baked/albedo_specular_dielectrics.xml").c_str(),
-		ofToDataPath("baked/albedo_specular_dielectrics_avg.xml").c_str());
+		ofToDataPath("baked/albedo_specular_dielectrics.bin").c_str(),
+		ofToDataPath("baked/albedo_specular_dielectrics_avg.bin").c_str());
 
 	SECTION("hemisphere_composite_simpson") {
 		double result = rt::hemisphere_composite_simpson<double>([](double theta, double phi) {
@@ -443,8 +442,8 @@ int main(int argc, char* const argv[])
 	char* custom_argv[] = {
 		"",
 		//"[microfacet sampling]"
-		"[ArbitraryBRDFSpace]"
-		//"[microfacet]"
+		//"[ArbitraryBRDFSpace]"
+		"[microfacet]"
 	};
 	Catch::Session().run(sizeof(custom_argv) / sizeof(custom_argv[0]), custom_argv);
 #else
