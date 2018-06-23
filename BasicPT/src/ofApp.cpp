@@ -49,8 +49,7 @@ namespace rt {
 					}
 				}
 				rtcCommitGeometry(embreeGeometry);
-				auto geomID = rtcAttachGeometry(_embreeScene, embreeGeometry);
-				_geomIDToIndex[geomID] = i;
+				rtcAttachGeometryByID(_embreeScene, embreeGeometry, i);
 				rtcReleaseGeometry(embreeGeometry);
 			}
 
@@ -109,9 +108,6 @@ namespace rt {
 			ray.dir_z = rd.z;
 			ray.time = 0.0;
 
-			// float tfar = 1.0 - bias;
-			//ray.tfar = tfar;
-			//ray.tnear = bias;
 			ray.tfar = 1.0f;
 			ray.tnear = 0.0f;
 
@@ -150,7 +146,7 @@ namespace rt {
 
 			*tmin = rayhit.ray.tfar;
 			
-			int index = _geomIDToIndex.find(rayhit.hit.geomID)->second;
+			int index = rayhit.hit.geomID;
 			const auto &prim = _scene->geometries[index].primitives[rayhit.hit.primID];
 			*material = prim.material;
 
@@ -182,8 +178,6 @@ namespace rt {
 		RTCDevice _embreeDevice = nullptr;
 		RTCScene _embreeScene = nullptr;
 		mutable RTCIntersectContext _context;
-
-		std::unordered_map<unsigned int, int> _geomIDToIndex;
 
 		struct EmissivePrimitiveRef {
 			int geometeryIndex;
@@ -499,7 +493,7 @@ void ofApp::setup() {
 	scene = std::shared_ptr<rt::Scene>(new rt::Scene());
 	rt::loadFromABC(ofToDataPath("cornelbox.abc").c_str(), *scene);
 	// rt::loadFromABC(ofToDataPath("mitsuba.abc").c_str(), *scene);
-
+	
 	renderer = std::shared_ptr<rt::PTRenderer>(new rt::PTRenderer(scene));
 
 	rt::CoupledBRDFConductor::load(
