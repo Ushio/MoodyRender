@@ -5,6 +5,7 @@
 #include "material.hpp"
 #include "value_prportional_sampler.hpp"
 #include "geometry.hpp"
+#include "stopwatch.hpp"
 
 #include <random>
 #include <xmmintrin.h>

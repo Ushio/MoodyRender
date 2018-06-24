@@ -64,13 +64,26 @@ namespace rt {
 
 	//	return chi_plus(glm::dot(Ng, omega_i)) * chi_plus(glm::dot(Ng, omega_o)) *  d * g / (4.0 * cos_term_wo * cos_term_wi);
 	//}
+	
+	struct BeckmannMicrosurfaceImportanceSampler {
+		static glm::dvec3 sample(PeseudoRandom *random, double alpha) {
+			double theta = std::atan(std::sqrt(-alpha * alpha * std::log(random->uniform())));
+			double phi = random->uniform(0.0, glm::two_pi<double>());
+			return polar_to_cartesian(theta, phi);
+		}
+		static double pdf(glm::dvec3 sampled_wi, double alpha, glm::dvec3 wo, glm::dvec3 Ng, glm::dvec3 *m = nullptr) {
+			glm::dvec3 half = glm::normalize(sampled_wi + wo);
+			if (m) {
+				*m = half;
+			}
+			return D_Beckmann(Ng, half, alpha) * glm::dot(Ng, half);
+		}
+	};
 
 	struct BeckmannImportanceSampler {
 		// サンプリング範囲が半球ではないことに注意
 		static glm::dvec3 sample(PeseudoRandom *random, double alpha, glm::dvec3 wo, glm::dvec3 Ng) {
-			double theta = std::atan(std::sqrt(-alpha * alpha * std::log(1.0 - random->uniform())));
-			double phi = random->uniform(0.0, glm::two_pi<double>());
-			glm::dvec3 sample = polar_to_cartesian(theta, phi);
+			glm::dvec3 sample = BeckmannMicrosurfaceImportanceSampler::sample(random, alpha);
 
 			ArbitraryBRDFSpace basis(Ng);
 			glm::dvec3 h = basis.localToGlobal(sample);
@@ -79,11 +92,12 @@ namespace rt {
 		}
 		// 裏面はサポートしない
 		static double pdf(glm::dvec3 sampled_wi, double alpha, glm::dvec3 wo, glm::dvec3 Ng) {
-			glm::dvec3 half = glm::normalize(sampled_wi + wo);
+			glm::dvec3 m;
+			double pdf_m = BeckmannMicrosurfaceImportanceSampler::pdf(sampled_wi, alpha, wo, Ng, &m);
 
 			// glm::dot(sampled_wi, half)が0になるのは、
 			// wiとwoが正反対の向き、つまりかならず裏側であるので、普段は問題にならない
-			return D_Beckmann(Ng, half, alpha) * glm::dot(Ng, half) / (4.0 * glm::dot(sampled_wi, half));
+			return pdf_m / (4.0 * glm::dot(sampled_wi, m));
 		}
 	};
 
@@ -91,8 +105,7 @@ namespace rt {
 		static glm::dvec3 sample(PeseudoRandom *random, double alpha, glm::dvec3 wo, glm::dvec3 Ng) {
 			double phi = random->uniform(0.0, glm::two_pi<double>());
 
-			double theta = std::atan(std::sqrt(-alpha * alpha * std::log(random->uniform())));
-			glm::dvec3 omega_m = polar_to_cartesian(theta, phi);
+			glm::dvec3 omega_m = BeckmannMicrosurfaceImportanceSampler::sample(random, alpha);
 			glm::dvec3 omega_m_dot = glm::dvec3(-omega_m.x, -omega_m.y, omega_m.z);
 
 			ArbitraryBRDFSpace basis(Ng);
@@ -100,9 +113,9 @@ namespace rt {
 
 			double visible     = glm::max(glm::dot(wo_local, omega_m),     0.0);
 			double visible_dot = glm::max(glm::dot(wo_local, omega_m_dot), 0.0);
-			double det = visible_dot / (visible + visible_dot);
+			double u = visible_dot / (visible + visible_dot);
 
-			glm::dvec3 sample = random->uniform() < det ? omega_m_dot : omega_m;
+			glm::dvec3 sample = random->uniform() < u ? omega_m_dot : omega_m;
 
 			glm::dvec3 h = basis.localToGlobal(sample);
 			glm::dvec3 wi = glm::reflect(-wo, h);
