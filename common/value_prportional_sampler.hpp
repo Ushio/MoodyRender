@@ -42,7 +42,7 @@ namespace rt{
 			return _values[index] / _sumValue;
 		}
 		int size() const {
-			return _values.size();
+			return (int)_values.size();
 		}
 	private:
 		Real _sumValue = Real(0.0);

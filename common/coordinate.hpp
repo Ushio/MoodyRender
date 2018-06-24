@@ -26,7 +26,7 @@ namespace rt {
 	// Building an Orthonormal Basis, Revisited
 	template <typename Real, glm::precision P>
 	inline void orthonormalBasis(const glm::tvec3<Real, P>& zaxis, glm::tvec3<Real, P> *xaxis, glm::tvec3<Real, P> *yaxis) {
-		const Real sign = copysignf(Real(1.0), zaxis.z);
+		const Real sign = std::copysign(Real(1.0), zaxis.z);
 		const Real a = Real(-1.0) / (sign + zaxis.z);
 		const Real b = zaxis.x * zaxis.y * a;
 		*xaxis = glm::tvec3<Real, P>(Real(1.0) + sign * zaxis.x * zaxis.x * a, sign * b, -sign * zaxis.x);

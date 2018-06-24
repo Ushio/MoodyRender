@@ -196,7 +196,7 @@ namespace rt {
 			int alphaIndex = alphaToIndex(alpha, _discreteSamplers.size());
 			const ValueProportionalSampler<double> &sampler = _discreteSamplers[alphaIndex];
 			int indexTheta = sampler.sample(random);
-			auto thetaRange = indexToThetaRange(indexTheta, sampler.size());
+			auto thetaRange = indexToThetaRange(indexTheta, (int)sampler.size());
 			return random->uniform(thetaRange.first, thetaRange.second);
 		}
 		double probability(double alpha, double theta) const {
