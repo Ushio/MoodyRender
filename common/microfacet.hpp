@@ -193,20 +193,20 @@ namespace rt {
 			}
 		}
 		double sampleTheta(double alpha, PeseudoRandom *random) const {
-			int alphaIndex = alphaToIndex(alpha, _discreteSamplers.size());
+			int alphaIndex = alphaToIndex(alpha, (int)_discreteSamplers.size());
 			const ValueProportionalSampler<double> &sampler = _discreteSamplers[alphaIndex];
 			int indexTheta = sampler.sample(random);
 			auto thetaRange = indexToThetaRange(indexTheta, (int)sampler.size());
 			return random->uniform(thetaRange.first, thetaRange.second);
 		}
 		double probability(double alpha, double theta) const {
-			int alphaIndex = alphaToIndex(alpha, _discreteSamplers.size());
+			int alphaIndex = alphaToIndex(alpha, (int)_discreteSamplers.size());
 			const ValueProportionalSampler<double> &sampler = _discreteSamplers[alphaIndex];
 			int thetaIndex = thetaToIndex(theta, sampler.size());
 			return sampler.probability(thetaIndex);
 		}
 		int thetaSize(double alpha) const {
-			int alphaIndex = alphaToIndex(alpha, _discreteSamplers.size());
+			int alphaIndex = alphaToIndex(alpha, (int)_discreteSamplers.size());
 			const ValueProportionalSampler<double> &sampler = _discreteSamplers[alphaIndex];
 			return sampler.size();
 		}
