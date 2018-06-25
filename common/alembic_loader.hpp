@@ -472,6 +472,7 @@ namespace rt {
 			const char *MicrofacetConductorMaterialString = "MicrofacetConductorMaterial";
 			const char *MicrofacetCoupledConductorMaterialString = "MicrofacetCoupledConductorMaterial";
 			const char *MicrofacetCoupledDielectricsMaterialString = "MicrofacetCoupledDielectricsMaterial";
+			const char *HeitzConductorMaterialString = "HeitzConductorMaterial";
 
 			auto material = abcGeom.primitiveAttributes.find("Material");
 			if (material != abcGeom.primitiveAttributes.end()) {
@@ -532,6 +533,9 @@ namespace rt {
 						}
 						else if (*materialString == SpecularMaterialString) {
 							geom.primitives[primID].material = SpecularMaterial();
+						}
+						else if (*materialString == HeitzConductorMaterialString) {
+							geom.primitives[primID].material = HeitzConductorMaterial();
 						}
 						else {
 							printf("loadFromABC unknown material string[%s]\n", materialString->c_str());

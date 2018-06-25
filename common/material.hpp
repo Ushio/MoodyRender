@@ -8,6 +8,7 @@
 #include "peseudo_random.hpp"
 #include "microfacet.hpp"
 #include "coordinate.hpp"
+#include "MicrosurfaceScattering.h"
 
 namespace rt {
 	class LambertianSampler {
@@ -301,6 +302,33 @@ namespace rt {
 		}
 	};
 
+
+	class HeitzConductorMaterial : public IMaterial {
+	public:
+		HeitzConductorMaterial() {
+			_microsurfaceConductor = std::shared_ptr<MicrosurfaceConductor>(new MicrosurfaceConductor(true, true, 0.3f, 0.3f));
+		}
+		glm::dvec3 bxdf(const glm::dvec3 &wo, const glm::dvec3 &wi) const override {
+			if (glm::dot(Ng, wi) < 0.0 || glm::dot(Ng, wo) < 0.0) {
+				return glm::dvec3(0.0);
+			}
+			// return glm::dvec3(1.0);
+			double cosTheta = std::abs(glm::dot(Ng, wi));
+			return glm::dvec3(1.0 / cosTheta);
+		}
+		glm::dvec3 sample(PeseudoRandom *random, const glm::dvec3 &wo) const override {
+			ArbitraryBRDFSpace space(Ng);
+			
+			auto sample = _microsurfaceConductor->sample(space.globalToLocal(wo));
+			
+			return space.localToGlobal(sample);
+		}
+		double pdf(const glm::dvec3 &wo, const glm::dvec3 &sampled_wi) const override {
+			return 1.0;
+		}
+		std::shared_ptr<MicrosurfaceConductor> _microsurfaceConductor;
+	};
+
 	class Material {
 	public:
 		typedef strict_variant::variant<
@@ -308,7 +336,8 @@ namespace rt {
 			SpecularMaterial,
 			MicrofacetConductorMaterial,
 			MicrofacetCoupledConductorMaterial,
-			MicrofacetCoupledDielectricsMaterial
+			MicrofacetCoupledDielectricsMaterial,
+			HeitzConductorMaterial
 		> MaterialType;
 
 		Material() {}
