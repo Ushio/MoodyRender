@@ -336,11 +336,9 @@ namespace rt {
 
 	class HeitzConductorMaterial : public IMaterial {
 	public:
-		glm::dvec3 eta = glm::dvec3(0.15557, 0.42415, 1.3821);
-		glm::dvec3 k = glm::dvec3(3.6024, 2.4721, 1.9155);
 
-		double alpha = 1.0;
-		HeitzConductorMaterial() {
+
+		HeitzConductorMaterial(double a):alpha(a) {
 			for (int i = 0; i < 3; ++i) {
 				_microsurfaceConductor[i] = std::shared_ptr<MicrosurfaceConductor>(new MicrosurfaceConductor(true, true, alpha, alpha));
 				_microsurfaceConductor[i]->n = eta[i];
@@ -363,8 +361,6 @@ namespace rt {
 			for (int i = 0; i < 3; ++i) {
 				brdf[i] = _microsurfaceConductor[i]->eval(space.globalToLocal(wi), space.globalToLocal(wo)) / cosThetaO;
 			}
-			// double brdf = _microsurfaceConductor->eval(space.globalToLocal(wi), space.globalToLocal(wo)) / cosThetaO;
-			// return glm::dvec3(brdf);
 			return brdf;
 		}
 		glm::dvec3 sample(PeseudoRandom *random, const glm::dvec3 &wo) const override {
@@ -386,36 +382,10 @@ namespace rt {
 				(1.0 - singleScattering) * UniformHemisphereSampler::pdf(sampled_wi, Ng);
 			return pdf_omega;
 		}
-
-		//glm::dvec3 sample(PeseudoRandom *random, const glm::dvec3 &wo) const override {
-		//	return LambertianSampler::sample(random, Ng);
-		//}
-		//virtual double pdf(const glm::dvec3 &wo, const glm::dvec3 &sampled_wi) const override {
-		//	return LambertianSampler::pdf(sampled_wi, Ng);
-		//}
-		//glm::dvec3 sample(PeseudoRandom *random, const glm::dvec3 &wo) const override {
-		//	return VCavityBeckmannVisibleNormalSampler::sample(random, 1.0, wo, Ng);
-		//}
-		//double pdf(const glm::dvec3 &wo, const glm::dvec3 &sampled_wi) const override {
-		//	return VCavityBeckmannVisibleNormalSampler::pdf(sampled_wi, 1.0, wo, Ng);
-		//}
-		//glm::dvec3 bxdf(const glm::dvec3 &wo, const glm::dvec3 &wi) const override {
-		//	if (glm::dot(Ng, wi) < 0.0 || glm::dot(Ng, wo) < 0.0) {
-		//		return glm::dvec3(0.0);
-		//	}
-		//	double cosTheta = std::abs(glm::dot(Ng, wi));
-		//	return glm::dvec3(1.0 / cosTheta);
-		//}
-		//glm::dvec3 sample(PeseudoRandom *random, const glm::dvec3 &wo) const override {
-		//	ArbitraryBRDFSpace space(Ng);
-		//	
-		//	auto sample = _microsurfaceConductor->sample(space.globalToLocal(wo));
-		//	
-		//	return space.localToGlobal(sample);
-		//}
-		//double pdf(const glm::dvec3 &wo, const glm::dvec3 &sampled_wi) const override {
-		//	return 1.0;
-		//}
+	private:
+		glm::dvec3 eta = glm::dvec3(0.15557, 0.42415, 1.3821);
+		glm::dvec3 k = glm::dvec3(3.6024, 2.4721, 1.9155);
+		double alpha = 1.0;
 		std::shared_ptr<MicrosurfaceConductor> _microsurfaceConductor[3];
 	};
 

@@ -60,11 +60,11 @@ inline T bicubic_kernel(Real t, T f0, T f1, T f2, T f3) {
 //	return bicubic_kernel(t, values[0], values[1], values[2], values[3]);
 //}
 
+// F: std::function<T(int)>
 // f(0.0) = sample(0)
 // f(1.0) = sample(size - 1)
-// generic
-template <class T, class Real>
-inline T bicubic_1d(Real x /* 0.0 => 1.0 */, int size, std::function<T(int)> sample) {
+template <class T, class Real, class F>
+inline T bicubic_1d(Real x /* 0.0 => 1.0 */, int size, F sample) {
 	Real index_f = x * (size - 1);
 	int index1 = (int)std::floor(index_f);
 
@@ -79,9 +79,9 @@ inline T bicubic_1d(Real x /* 0.0 => 1.0 */, int size, std::function<T(int)> sam
 	return bicubic_kernel(t, values[0], values[1], values[2], values[3]);
 }
 
-
-template <class T, class Real>
-inline T bicubic_2d(Real x /* 0.0 => 1.0 */, Real y /* 0.0 => 1.0 */, int sizex, int sizey, std::function<T(int, int)> sample) {
+// F: std::function<T(int, int)>
+template <class T, class Real, class F>
+inline T bicubic_2d(Real x /* 0.0 => 1.0 */, Real y /* 0.0 => 1.0 */, int sizex, int sizey, F sample) {
 	Real index_xf = x * (sizex - 1);
 	Real index_yf = y * (sizey - 1);
 	int index1x = (int)std::floor(index_xf);

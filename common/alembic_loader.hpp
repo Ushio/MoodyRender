@@ -535,7 +535,16 @@ namespace rt {
 							geom.primitives[primID].material = SpecularMaterial();
 						}
 						else if (*materialString == HeitzConductorMaterialString) {
-							geom.primitives[primID].material = HeitzConductorMaterial();
+							double alpha = 0.5;
+
+							if (abcGeom.primitiveAttributes.count("roughness")) {
+								const std::vector<AttributeVariant> &roughnesses = abcGeom.primitiveAttributes["roughness"];
+								if (auto roughness = strict_variant::get<double>(&roughnesses[primID])) {
+									alpha = (*roughness) * (*roughness);
+								}
+							}
+
+							geom.primitives[primID].material = HeitzConductorMaterial(alpha);
 						}
 						else {
 							printf("loadFromABC unknown material string[%s]\n", materialString->c_str());

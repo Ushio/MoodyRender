@@ -9,9 +9,11 @@
 #include "simpson_helper.hpp"
 #include "linear_transform.hpp"
 
+static const int kBakeResolution = 64;
+
 inline void bake(std::string name, bool include_fresnel_dielectrics) {
 	rt::SpecularAlbedo albedo;
-	albedo.build(256, 256, [&](double alpha, double cosTheta) {
+	albedo.build(kBakeResolution, kBakeResolution, [&](double alpha, double cosTheta) {
 		using namespace rt;
 		glm::dvec3 wo = glm::dvec3(std::sqrt(1.0 - cosTheta * cosTheta), 0.0, cosTheta);
 		glm::dvec3 Ng(0.0, 0.0, 1.0);
@@ -22,15 +24,12 @@ inline void bake(std::string name, bool include_fresnel_dielectrics) {
 
 		OnlineMean<double> mean;
 		for (int i = 0; i < SampleCount; ++i) {
-			//glm::dvec3 wi = BeckmannImportanceSampler::sample(&random, alpha, wo, Ng);
-			//double pdf_omega = BeckmannImportanceSampler::pdf(wi, alpha, wo, Ng);
 			glm::dvec3 wi = VCavityBeckmannVisibleNormalSampler::sample(&random, alpha, wo, Ng);
 			double pdf_omega = VCavityBeckmannVisibleNormalSampler::pdf(wi, alpha, wo, Ng);
 
 			glm::dvec3 h = glm::normalize(wi + wo);
 			double d = D_Beckmann(Ng, h, alpha);
 			double g = G2_v_cavity(wo, wi, h, Ng);
-			// double g = G2_height_correlated_beckmann(wi, wo, h, Ng, alpha);
 
 			double cos_term_wo = glm::dot(Ng, wo);
 			double cos_term_wi = glm::dot(Ng, wi);
@@ -78,11 +77,11 @@ void bake_avg(const char *albedoFile, const char *dstName) {
 	loadFromBinary(albedo, ofToDataPath(albedoFile).c_str());
 	
 	rt::SpecularAvgAlbedo avg;
-	avg.build(256, [&](double alpha) {
+	avg.build(kBakeResolution, [&](double alpha) {
 		return 2.0 * rt::composite_simpson<double>([&](double theta) {
 			double cosTheta = cos(theta);
 			return albedo.sample(alpha, cosTheta) * cosTheta * sin(theta);
-		}, 256, 0.0, glm::pi<double>() * 0.5);
+		}, kBakeResolution, 0.0, glm::pi<double>() * 0.5);
 	});
 	saveAsBinary(avg, ofToDataPath(dstName).c_str());
 }
@@ -90,10 +89,10 @@ void bake_avg(const char *albedoFile, const char *dstName) {
 
 //--------------------------------------------------------------
 void ofApp::setup() {
-	 //rt::Stopwatch sw;
-	 //bake("albedo_specular_conductor", false);
-	 //bake("albedo_specular_dielectrics", true);
-	 //printf("done %f seconds\n", sw.elapsed());
+	 rt::Stopwatch sw;
+	 bake("albedo_specular_conductor", false);
+	 bake("albedo_specular_dielectrics", true);
+	 printf("done %f seconds\n", sw.elapsed());
 
 	 bake_avg("albedo_specular_conductor.bin", "albedo_specular_conductor_avg.bin");
 	 bake_avg("albedo_specular_dielectrics.bin", "albedo_specular_dielectrics_avg.bin");

@@ -531,60 +531,66 @@ void ofApp::draw() {
 	ofPopMatrix();
 
 	ofSetColor(255);
-	for (int i = 0; i < scene->geometries.size(); ++i) {
-		ofMesh mesh;
 
-		auto geometry = scene->geometries[i];
-		for (int j = 0; j < geometry.points.size(); ++j) {
-			auto p = geometry.points[j].P;
-			mesh.addVertex(ofVec3f(p.x, p.y, p.z));
+	if (0) {
+		for (int i = 0; i < scene->geometries.size(); ++i) {
+			static ofMesh mesh;
+			mesh.clear();
+
+			auto geometry = scene->geometries[i];
+			for (int j = 0; j < geometry.points.size(); ++j) {
+				auto p = geometry.points[j].P;
+				mesh.addVertex(ofVec3f(p.x, p.y, p.z));
+			}
+			for (int j = 0; j < geometry.primitives.size(); ++j) {
+				auto prim = geometry.primitives[j];
+				mesh.addIndex(prim.indices[0]);
+				mesh.addIndex(prim.indices[1]);
+				mesh.addIndex(prim.indices[2]);
+			}
+			mesh.drawWireframe();
 		}
-		for (int j = 0; j < geometry.primitives.size(); ++j) {
-			auto prim = geometry.primitives[j];
-			mesh.addIndex(prim.indices[0]);
-			mesh.addIndex(prim.indices[1]);
-			mesh.addIndex(prim.indices[2]);
-		}
-		mesh.drawWireframe();
-	}
-	{
-		auto camera = scene->camera;
-		ofSetColor(255);
-		auto origin = camera.origin();
-		ofDrawSphere(origin.x, origin.y, origin.z, 0.05);
-
-		ofSetColor(0, 0, 255);
-		auto frontP = origin + camera.front() * 0.2;
-		ofDrawLine(origin.x, origin.y, origin.z, frontP.x, frontP.y, frontP.z);
-
-		ofSetColor(255, 0, 0);
-		auto upP = origin + camera.up() * 0.2;
-		ofDrawLine(origin.x, origin.y, origin.z, upP.x, upP.y, upP.z);
-	}
-
-	{
-		rt::Xor64 random;
-		int x = ofMap(ofGetMouseX(), 0, ofGetWidth(), 0, scene->camera.imageWidth());
-		int y = ofMap(ofGetMouseY(), 0, ofGetHeight(), 0, scene->camera.imageHeight());
-		glm::dvec3 o;
-		glm::dvec3 d;
-		scene->camera.sampleRay(&random, x, y, &o, &d);
-
-		rt::Material m;
-		float tmin = 0.0f;
-		if (renderer->sceneInterface().intersect(o, d, &m, &tmin)) {
-			ofSetColor(255, 0, 0);
-			auto p = o + d * (double)tmin;
-			ofDrawLine(o.x, o.y, o.z, p.x, p.y, p.z);
-			
-			auto pn = p + m->Ng * 0.1;
-			ofDrawLine(p.x, p.y, p.z, pn.x, pn.y, pn.z);
-		} else {
+		{
+			auto camera = scene->camera;
 			ofSetColor(255);
-			auto p = o + d * 10.0;
-			ofDrawLine(o.x, o.y, o.z, p.x, p.y, p.z);
+			auto origin = camera.origin();
+			ofDrawSphere(origin.x, origin.y, origin.z, 0.05);
+
+			ofSetColor(0, 0, 255);
+			auto frontP = origin + camera.front() * 0.2;
+			ofDrawLine(origin.x, origin.y, origin.z, frontP.x, frontP.y, frontP.z);
+
+			ofSetColor(255, 0, 0);
+			auto upP = origin + camera.up() * 0.2;
+			ofDrawLine(origin.x, origin.y, origin.z, upP.x, upP.y, upP.z);
+		}
+
+		{
+			rt::Xor64 random;
+			int x = ofMap(ofGetMouseX(), 0, ofGetWidth(), 0, scene->camera.imageWidth());
+			int y = ofMap(ofGetMouseY(), 0, ofGetHeight(), 0, scene->camera.imageHeight());
+			glm::dvec3 o;
+			glm::dvec3 d;
+			scene->camera.sampleRay(&random, x, y, &o, &d);
+
+			rt::Material m;
+			float tmin = 0.0f;
+			if (renderer->sceneInterface().intersect(o, d, &m, &tmin)) {
+				ofSetColor(255, 0, 0);
+				auto p = o + d * (double)tmin;
+				ofDrawLine(o.x, o.y, o.z, p.x, p.y, p.z);
+
+				auto pn = p + m->Ng * 0.1;
+				ofDrawLine(p.x, p.y, p.z, pn.x, pn.y, pn.z);
+			}
+			else {
+				ofSetColor(255);
+				auto p = o + d * 10.0;
+				ofDrawLine(o.x, o.y, o.z, p.x, p.y, p.z);
+			}
 		}
 	}
+
 
 	{
 		renderer->step();

@@ -151,60 +151,6 @@ TEST_CASE("LambertianMaterial", "[LambertianMaterial]") {
 	}
 }
 
-TEST_CASE("microfacet sampling", "[microfacet sampling]") {
-	rt::CoupledBRDFConductor::load(
-		ofToDataPath("baked/albedo_specular_conductor.bin").c_str(),
-		ofToDataPath("baked/albedo_specular_conductor_avg.bin").c_str());
-	rt::CoupledBRDFDielectrics::load(
-		ofToDataPath("baked/albedo_specular_dielectrics.bin").c_str(),
-		ofToDataPath("baked/albedo_specular_dielectrics_avg.bin").c_str());
-
-	SECTION("white furnance test by v cavity beckmann visible normal") {
-		using namespace rt;
-
-		rt::Xor64 *random = new rt::Xor64();
-		for (int j = 0; j < 32; ++j) {
-			double alpha = random->uniform(0.5, 1.0);
-			glm::dvec3 Ng(0.0, 0.0, 1.0);
-			glm::dvec3 wo = LambertianSampler::sample(random, Ng);
-
-			MicrofacetCoupledConductorMaterial m;
-			m.Ng = Ng;
-			m.alpha = alpha;
-			m.useFresnel = false;
-
-			OnlineMean<double> mean;
-
-			for (int i = 0; i < 500000; ++i) {
-				// glm::dvec3 wi = BeckmannImportanceSampler::sample(random, alpha, wo, Ng);
-				glm::dvec3 wi = m.sample(random, wo);
-				glm::dvec3 bxdf = m.bxdf(wo, wi);
-				// double pdf = BeckmannImportanceSampler::pdf(wi, alpha, wo, Ng);
-				double pdf = m.pdf(wo, wi);
-				double cosTheta = glm::dot(m.Ng, wi);
-
-				glm::dvec3 value;
-				if (glm::any(glm::greaterThanEqual(bxdf, glm::dvec3(1.0e-6f)))) {
-					value = bxdf * cosTheta / pdf;
-				}
-				else {
-					value = glm::dvec3(0.0);
-				}
-				mean.addSample(value.x);
-			}
-
-			double result = mean.mean();
-
-			CAPTURE(alpha);
-			CAPTURE(glm::dot(Ng, wo));
-			REQUIRE(std::abs(result - 1.0) < 1.0e-2);
-			// printf("alpha %f\n", alpha);
-			// printf("result %f\n", result);
-		}
-	}
-
-}
-
 TEST_CASE("microfacet", "[microfacet]") {
 	rt::CoupledBRDFConductor::load(
 		ofToDataPath("baked/albedo_specular_conductor.bin").c_str(),
@@ -275,6 +221,8 @@ TEST_CASE("microfacet", "[microfacet]") {
 			CAPTURE(alpha);
 			CAPTURE(glm::dot(Ng, wo));
 			REQUIRE(std::abs(result - 1.0) < 1.0e-2);
+
+			printf("coupled conductor %.10f\n", result);
 		}
 	}
 
@@ -309,7 +257,7 @@ TEST_CASE("microfacet", "[microfacet]") {
 			CAPTURE(alpha);
 			CAPTURE(glm::dot(Ng, wo));
 			REQUIRE(std::abs(result - 1.0) < 1.0e-2);
-			// printf("%f\n", result);
+			printf("coupled dielectrics %.10f\n", result);
 		}
 	}
 
@@ -355,7 +303,7 @@ TEST_CASE("microfacet", "[microfacet]") {
 			CAPTURE(alpha);
 			CAPTURE(glm::dot(Ng, wo));
 			REQUIRE(std::abs(result - 1.0) < 1.0e-2);
-			// printf("%f\n", result);
+			printf("MC coupled conductor %.10f\n", result);
 		}
 	}
 
@@ -400,6 +348,7 @@ TEST_CASE("microfacet", "[microfacet]") {
 			CAPTURE(alpha);
 			CAPTURE(glm::dot(Ng, wo));
 			REQUIRE(std::abs(result - 1.0) < 1.0e-2);
+			printf("MC coupled dielectrics %.10f\n", result);
 		}
 	}
 }
@@ -437,13 +386,13 @@ TEST_CASE("ArbitraryBRDFSpace", "[ArbitraryBRDFSpace]") {
 
 int main(int argc, char* const argv[])
 {
-#if 1
+#if 0
 	// テストを指定する場合
 	char* custom_argv[] = {
 		"",
-		//"[microfacet sampling]"
+		"[microfacet sampling]"
 		//"[ArbitraryBRDFSpace]"
-		"[microfacet]"
+		//"[microfacet]"
 	};
 	Catch::Session().run(sizeof(custom_argv) / sizeof(custom_argv[0]), custom_argv);
 #else
