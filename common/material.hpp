@@ -13,18 +13,25 @@
 namespace rt {
 	class UniformHemisphereSampler {
 	public:
+		// http://mathworld.wolfram.com/SpherePointPicking.html
+		// Marsaglia (1972)
 		static glm::dvec3 sample(PeseudoRandom *random, const glm::dvec3 &Ng) {
-			glm::dvec3 d;
-			double sq = 0.0;
+			double x1;
+			double x2;
+			double S;
 			do {
-				d.x = random->uniform(-1.0, 1.0);
-				d.y = random->uniform(-1.0, 1.0);
-				d.z = random->uniform(-1.0, 1.0);
+				x1 = random->uniform(-1.0, 1.0);
+				x2 = random->uniform(-1.0, 1.0);
+				S = x1 * x1 + x2 * x2;
+			} while (S >= 1.0);
 
-				sq = glm::length2(d);
-			} while (sq < 0.0001 || 1.0 < sq);
-			d /= glm::sqrt(sq);
-			d.z = std::abs(d.z);
+			double two_sqrt_one_minus_s = 2.0 * sqrt(1.0 - S);
+			glm::dvec3 d(
+				x1 * two_sqrt_one_minus_s,
+				x2 * two_sqrt_one_minus_s,
+				std::abs(1.0 - 2.0 * S)
+			);
+
 			ArbitraryBRDFSpace space(Ng);
 			return space.localToGlobal(d);
 		}

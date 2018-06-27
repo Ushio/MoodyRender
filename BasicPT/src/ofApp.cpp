@@ -194,10 +194,11 @@ namespace rt {
 
 	class Image {
 	public:
-		Image(int w, int h) :_w(w), _h(h), _pixels(h*w) {
-			std::mt19937 engine(632431);
-			for (int i = 0; i < _pixels.size(); ++i) {
-				_pixels[i].random = Xor64(engine());
+		Image(int w, int h) :_w(w), _h(h), _pixels(h * w), _randoms(h * w) {
+			XoroshiroPlus128 random;
+			for (int i = 0; i < _randoms.size(); ++i) {
+				_randoms[i] = random;
+				random.jump();
 			}
 		}
 		int width() const {
@@ -216,7 +217,6 @@ namespace rt {
 		struct Pixel {
 			int sample = 0;
 			glm::dvec3 color;
-			Xor64 random;
 		};
 		const Pixel *pixel(int x, int y) const {
 			return _pixels.data() + y * _w + x;
@@ -224,10 +224,15 @@ namespace rt {
 		Pixel *pixel(int x, int y) {
 			return _pixels.data() + y * _w + x;
 		}
+
+		PeseudoRandom *random(int x, int y) {
+			return _randoms.data() + y * _w + x;
+		}
 	private:
 		int _w = 0;
 		int _h = 0;
 		std::vector<Pixel> _pixels;
+		std::vector<XoroshiroPlus128> _randoms;
 	};
 
 	inline double GTerm(const glm::dvec3 &p, double cosThetaP, const glm::dvec3 &q, double cosThetaQ) {
@@ -358,7 +363,6 @@ namespace rt {
 	//	return Lo;
 	//}
 
-
 	class PTRenderer {
 	public:
 		PTRenderer(std::shared_ptr<rt::Scene> scene)
@@ -404,7 +408,7 @@ namespace rt {
 			tbb::parallel_for(tbb::blocked_range<int>(0, _scene->camera.imageHeight()), [&](const tbb::blocked_range<int> &range) {
 				for (int y = range.begin(); y < range.end(); ++y) {
 					for (int x = 0; x < _scene->camera.imageWidth(); ++x) {
-						PeseudoRandom *random = &_image.pixel(x, y)->random;
+						PeseudoRandom *random = _image.random(x, y);
 						glm::dvec3 o;
 						glm::dvec3 d;
 						_scene->camera.sampleRay(random, x, y, &o, &d);
