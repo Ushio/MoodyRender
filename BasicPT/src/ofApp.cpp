@@ -495,9 +495,13 @@ void ofApp::setup() {
 	_camera.setFarClip(100.0);
 	_camera.setDistance(5.0);
 
+	rt::Stopwatch sw;
+
 	scene = std::shared_ptr<rt::Scene>(new rt::Scene());
 	rt::loadFromABC(ofToDataPath("cornelbox.abc").c_str(), *scene);
 	// rt::loadFromABC(ofToDataPath("mitsuba.abc").c_str(), *scene);
+
+	printf("load scene %f seconds\n", sw.elapsed());
 	
 	renderer = std::shared_ptr<rt::PTRenderer>(new rt::PTRenderer(scene));
 
