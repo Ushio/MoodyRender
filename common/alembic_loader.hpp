@@ -447,112 +447,118 @@ namespace rt {
 		}
 	}
 
+	inline Geometry geometryMaterialBinding(AlembicGeometry abcGeom) {
+		Geometry geom;
+		for (int pointID = 0; pointID < abcGeom.points.size(); ++pointID) {
+			Geometry::Point point;
+			point.P = abcGeom.points[pointID];
+			geom.points.push_back(point);
+		}
+		for (int primID = 0; primID < abcGeom.primitives.size(); ++primID) {
+			Geometry::Primitive prim;
+			prim.indices = abcGeom.primitives[primID];
+			prim.material = LambertianMaterial();
+			geom.primitives.push_back(prim);
+		}
+
+		// Primitive Material
+		const char *LambertianMaterialString = "LambertianMaterial";
+		const char *SpecularMaterialString = "SpecularMaterial";
+		const char *MicrofacetConductorMaterialString = "MicrofacetConductorMaterial";
+		const char *MicrofacetCoupledConductorMaterialString = "MicrofacetCoupledConductorMaterial";
+		const char *MicrofacetCoupledDielectricsMaterialString = "MicrofacetCoupledDielectricsMaterial";
+		const char *HeitzConductorMaterialString = "HeitzConductorMaterial";
+
+		auto material = abcGeom.primitiveAttributes.find("Material");
+		if (material == abcGeom.primitiveAttributes.end()) {
+			return geom;
+		}
+		std::vector<AttributeVariant> materials = material->second;
+		for (int primID = 0; primID < materials.size(); ++primID) {
+			std::string materialString;
+			if (auto m = strict_variant::get<std::string>(&materials[primID])) {
+				materialString = *m;
+			}
+			else {
+				printf("loadFromABC unknown material string[%s]\n", m->c_str());
+			}
+
+			if (materialString == LambertianMaterialString) {
+				LambertianMaterial m;
+				if (abcGeom.primitiveAttributes.count("Le")) {
+					auto Le = abcGeom.primitiveAttributes["Le"][primID];
+					if (auto LeVec3 = strict_variant::get<glm::dvec3>(&Le)) {
+						m.Le = *LeVec3;
+					}
+				}
+				if (abcGeom.primitiveAttributes.count("Cd")) {
+					auto Cd = abcGeom.primitiveAttributes["Cd"][primID];
+					if (auto CdVec3 = strict_variant::get<glm::dvec3>(&Cd)) {
+						m.R = *CdVec3;
+					}
+				}
+				geom.primitives[primID].material = m;
+			}
+			else if (materialString == MicrofacetConductorMaterialString) {
+				MicrofacetConductorMaterial m;
+				if (abcGeom.primitiveAttributes.count("roughness")) {
+					const std::vector<AttributeVariant> &roughnesses = abcGeom.primitiveAttributes["roughness"];
+					if (auto roughness = strict_variant::get<double>(&roughnesses[primID])) {
+						m.alpha = (*roughness) * (*roughness);
+					}
+				}
+				geom.primitives[primID].material = m;
+			}
+			else if (materialString == MicrofacetCoupledConductorMaterialString) {
+				MicrofacetCoupledConductorMaterial m;
+				if (abcGeom.primitiveAttributes.count("roughness")) {
+					const std::vector<AttributeVariant> &roughnesses = abcGeom.primitiveAttributes["roughness"];
+					if (auto roughness = strict_variant::get<double>(&roughnesses[primID])) {
+						m.alpha = (*roughness) * (*roughness);
+					}
+				}
+				geom.primitives[primID].material = m;
+			}
+			else if (materialString == MicrofacetCoupledDielectricsMaterialString) {
+				MicrofacetCoupledDielectricsMaterial m;
+				if (abcGeom.primitiveAttributes.count("roughness")) {
+					const std::vector<AttributeVariant> &roughnesses = abcGeom.primitiveAttributes["roughness"];
+					if (auto roughness = strict_variant::get<double>(&roughnesses[primID])) {
+						m.alpha = (*roughness) * (*roughness);
+					}
+				}
+				if (abcGeom.primitiveAttributes.count("Cd")) {
+					const std::vector<AttributeVariant> &Cd = abcGeom.primitiveAttributes["Cd"];
+					if (auto CdVec3 = strict_variant::get<glm::dvec3>(&Cd[primID])) {
+						m.Cd = *CdVec3;
+					}
+				}
+				geom.primitives[primID].material = m;
+			}
+			else if (materialString == SpecularMaterialString) {
+				geom.primitives[primID].material = SpecularMaterial();
+			}
+			else if (materialString == HeitzConductorMaterialString) {
+				double alpha = 0.5;
+
+				if (abcGeom.primitiveAttributes.count("roughness")) {
+					const std::vector<AttributeVariant> &roughnesses = abcGeom.primitiveAttributes["roughness"];
+					if (auto roughness = strict_variant::get<double>(&roughnesses[primID])) {
+						alpha = (*roughness) * (*roughness);
+					}
+				}
+
+				geom.primitives[primID].material = HeitzConductorMaterial(alpha);
+			}
+		}
+		return geom;
+	}
+
 	inline void loadFromABC(const char *filename, Scene &scene) {
 		IArchive archive(Alembic::AbcCoreOgawa::ReadArchive(), filename);
 		IObject top(archive, kTop);
 		rt::printHierarchy(top);
 
-		rt::parseHierarchy(top, scene, [](AlembicGeometry abcGeom) {
-			Geometry geom;
-			for (int pointID = 0; pointID < abcGeom.points.size(); ++pointID) {
-				Geometry::Point point;
-				point.P = abcGeom.points[pointID];
-				geom.points.push_back(point);
-			}
-			for (int primID = 0; primID < abcGeom.primitives.size(); ++primID) {
-				Geometry::Primitive prim;
-				prim.indices = abcGeom.primitives[primID];
-				prim.material = LambertianMaterial();
-				geom.primitives.push_back(prim);
-			}
-
-			// Primitive Material
-			const char *LambertianMaterialString = "LambertianMaterial";
-			const char *SpecularMaterialString = "SpecularMaterial";
-			const char *MicrofacetConductorMaterialString = "MicrofacetConductorMaterial";
-			const char *MicrofacetCoupledConductorMaterialString = "MicrofacetCoupledConductorMaterial";
-			const char *MicrofacetCoupledDielectricsMaterialString = "MicrofacetCoupledDielectricsMaterial";
-			const char *HeitzConductorMaterialString = "HeitzConductorMaterial";
-
-			auto material = abcGeom.primitiveAttributes.find("Material");
-			if (material != abcGeom.primitiveAttributes.end()) {
-				std::vector<AttributeVariant> materials = material->second;
-				for (int primID = 0; primID < materials.size(); ++primID) {
-					if (auto materialString = strict_variant::get<std::string>(&materials[primID])) {
-						if (*materialString == LambertianMaterialString) {
-							LambertianMaterial m;
-							if (abcGeom.primitiveAttributes.count("Le")) {
-								auto Le = abcGeom.primitiveAttributes["Le"][primID];
-								if (auto LeVec3 = strict_variant::get<glm::dvec3>(&Le)) {
-									m.Le = *LeVec3;
-								}
-							}
-							if (abcGeom.primitiveAttributes.count("Cd")) {
-								auto Cd = abcGeom.primitiveAttributes["Cd"][primID];
-								if (auto CdVec3 = strict_variant::get<glm::dvec3>(&Cd)) {
-									m.R = *CdVec3;
-								}
-							}
-							geom.primitives[primID].material = m;
-						}
-						else if (*materialString == MicrofacetConductorMaterialString) {
-							MicrofacetConductorMaterial m;
-							if (abcGeom.primitiveAttributes.count("roughness")) {
-								const std::vector<AttributeVariant> &roughnesses = abcGeom.primitiveAttributes["roughness"];
-								if (auto roughness = strict_variant::get<double>(&roughnesses[primID])) {
-									m.alpha = (*roughness) * (*roughness);
-								}
-							}
-							geom.primitives[primID].material = m;
-						}
-						else if (*materialString == MicrofacetCoupledConductorMaterialString) {
-							MicrofacetCoupledConductorMaterial m;
-							if (abcGeom.primitiveAttributes.count("roughness")) {
-								const std::vector<AttributeVariant> &roughnesses = abcGeom.primitiveAttributes["roughness"];
-								if (auto roughness = strict_variant::get<double>(&roughnesses[primID])) {
-									m.alpha = (*roughness) * (*roughness);
-								}
-							}
-							geom.primitives[primID].material = m;
-						}
-						else if (*materialString == MicrofacetCoupledDielectricsMaterialString) {
-							MicrofacetCoupledDielectricsMaterial m;
-							if (abcGeom.primitiveAttributes.count("roughness")) {
-								const std::vector<AttributeVariant> &roughnesses = abcGeom.primitiveAttributes["roughness"];
-								if (auto roughness = strict_variant::get<double>(&roughnesses[primID])) {
-									m.alpha = (*roughness) * (*roughness);
-								}
-							}
-							if (abcGeom.primitiveAttributes.count("Cd")) {
-								const std::vector<AttributeVariant> &Cd = abcGeom.primitiveAttributes["Cd"];
-								if (auto CdVec3 = strict_variant::get<glm::dvec3>(&Cd[primID])) {
-									m.Cd = *CdVec3;
-								}
-							}
-							geom.primitives[primID].material = m;
-						}
-						else if (*materialString == SpecularMaterialString) {
-							geom.primitives[primID].material = SpecularMaterial();
-						}
-						else if (*materialString == HeitzConductorMaterialString) {
-							double alpha = 0.5;
-
-							if (abcGeom.primitiveAttributes.count("roughness")) {
-								const std::vector<AttributeVariant> &roughnesses = abcGeom.primitiveAttributes["roughness"];
-								if (auto roughness = strict_variant::get<double>(&roughnesses[primID])) {
-									alpha = (*roughness) * (*roughness);
-								}
-							}
-
-							geom.primitives[primID].material = HeitzConductorMaterial(alpha);
-						}
-						else {
-							printf("loadFromABC unknown material string[%s]\n", materialString->c_str());
-						}
-					}
-				}
-			}
-			return geom;
-		});
+		rt::parseHierarchy(top, scene, geometryMaterialBinding);
 	}
 }
