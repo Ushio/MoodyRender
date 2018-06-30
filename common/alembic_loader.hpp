@@ -4,6 +4,8 @@
 #include <Alembic/AbcCoreOgawa/All.h>
 #include <Alembic/AbcGeom/All.h>
 
+#include <tbb/tbb.h>
+
 #include "render_object.hpp"
 
 #include <functional>
@@ -323,7 +325,7 @@ namespace rt {
 		return matrix;
 	}
 
-	inline void parseHierarchy(IObject o, Scene &scene, std::function<Geometry (AlembicGeometry)> binding) {
+	inline void parseHierarchy(IObject o, Scene &scene, std::function<Geometry (const AlembicGeometry&)> binding) {
 		auto header = o.getHeader();
 
 		if (IPolyMesh::matches(header)) {
@@ -361,11 +363,12 @@ namespace rt {
 			std::map<std::string, std::vector<AttributeVariant>> primAttributes;
 
 			const int32_t *indices = IndicesSample->get();
-			//int primitiveCount = 0;
-			//for (int i = 0; i < FaceCountsSample->size(); ++i) {
-			//	primitiveCount += FaceCountsSample->get()[i];
-			//}
 
+			std::vector<std::string> attribKeys;
+			for (auto it = attributes.begin(); it != attributes.end(); ++it) {
+				attribKeys.emplace_back(it->first);
+			}
+	
 			for (int i = 0; i < FaceCountsSample->size(); ++i) {
 				auto count = FaceCountsSample->get()[i];
 
@@ -378,14 +381,13 @@ namespace rt {
 
 					for (auto it = attributes.begin(); it != attributes.end(); ++it) {
 						if (it->second.size() == FaceCountsSample->size()) {
-							AttributeVariant attrib = it->second[i];
-							primAttributes[it->first].push_back(attrib);
+							primAttributes[it->first].emplace_back(it->second[i]);
 						}
 					}
 				}
 				indices += count;
 			}
-			geometry.primitiveAttributes = primAttributes;
+			geometry.primitiveAttributes = std::move(primAttributes);
 
 			scene.geometries.push_back(binding(geometry));
 		}
@@ -472,7 +474,7 @@ namespace rt {
 		}
 	}
 
-	inline Geometry geometryMaterialBinding(AlembicGeometry abcGeom) {
+	inline Geometry geometryMaterialBinding(const AlembicGeometry &abcGeom) {
 		Geometry geom;
 		for (int pointID = 0; pointID < abcGeom.points.size(); ++pointID) {
 			Geometry::Point point;
@@ -498,10 +500,10 @@ namespace rt {
 			return rouphness * rouphness;
 		};
 
-		for (int primID = 0; primID < abcGeom.primitives.size(); ++primID) {
+		auto parseMaterial = [&](int primID) {
 			std::string materialString;
 			if (abcGeom.getAttribute<std::string>("Material", primID, &materialString) == false) {
-				continue;
+				return;
 			}
 
 			if (materialString == LambertianMaterialString) {
@@ -546,7 +548,13 @@ namespace rt {
 				}
 				geom.primitives[primID].material = HeitzConductorMaterial(alpha);
 			}
-		}
+		};
+
+		tbb::parallel_for(tbb::blocked_range<int>(0, abcGeom.primitives.size()), [&](const tbb::blocked_range<int> &range) {
+			for (int primID = range.begin(); primID < range.end(); ++primID) {
+				parseMaterial(primID);
+			}
+		});
 		return geom;
 	}
 
