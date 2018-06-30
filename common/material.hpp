@@ -4,11 +4,11 @@
 #include <glm/ext.hpp>
 
 #include <functional>
-#include <strict_variant/variant.hpp>
 #include "peseudo_random.hpp"
 #include "microfacet.hpp"
 #include "coordinate.hpp"
 #include "MicrosurfaceScattering.h"
+#include "stack_based_polymophic_value.hpp"
 
 namespace rt {
 	class UniformHemisphereSampler {
@@ -389,37 +389,13 @@ namespace rt {
 		std::shared_ptr<MicrosurfaceConductor> _microsurfaceConductor[3];
 	};
 
-	class Material {
-	public:
-		typedef strict_variant::variant<
-			LambertianMaterial,
-			SpecularMaterial,
-			MicrofacetConductorMaterial,
-			MicrofacetCoupledConductorMaterial,
-			MicrofacetCoupledDielectricsMaterial,
-			HeitzConductorMaterial
-		> MaterialType;
+	typedef StackBasedPolymophicValue<IMaterial,
+		LambertianMaterial,
+		SpecularMaterial,
+		MicrofacetConductorMaterial,
+		MicrofacetCoupledConductorMaterial,
+		MicrofacetCoupledDielectricsMaterial,
+		HeitzConductorMaterial
+	> Material;
 
-		Material() {}
-		Material(const MaterialType &m) :_material(m) { }
-		Material &operator=(const MaterialType &m) { _material = m; return *this; }
-
-		IMaterial *operator->() {
-			return strict_variant::apply_visitor([](IMaterial &m) { return &m; }, _material);
-		}
-		const IMaterial *operator->() const {
-			return strict_variant::apply_visitor([](const IMaterial &m) { return &m; }, _material);
-		}
-		
-		template <class T>
-		T *get() {
-			return _material.get<T>();
-		}
-		template <class T>
-		const T *get() const {
-			return _material.get<T>();
-		}
-	private:
-		MaterialType _material;
-	};
 }
