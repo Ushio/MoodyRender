@@ -168,57 +168,6 @@ namespace rt {
 			[](ICompoundProperty prop, std::string name) { printf("  %s [ICompoundProperty]\n", name.c_str()); }
 		);
 	}
-	inline std::vector<string> propertyMaterial(ICompoundProperty props) throw(std::exception) {
-		const char *vals_name = "/.geom/.arbGeomParams/Material/.vals";
-		const char *indices_name = "/.geom/.arbGeomParams/Material/.indices";
-		std::vector<std::string> vals;
-		std::vector<uint32_t> indices;
-
-		bool foundVals = false;
-		bool foundIndices = false;
-
-		visitProperties(props,
-			[](IScalarProperty prop, std::string name) {},
-			[&](IArrayProperty prop, std::string name) {
-			if (name == indices_name) {
-				foundIndices = true;
-
-				Abc::IUInt32ArrayProperty arrayProp(prop.getParent(), prop.getName());
-				UInt32ArraySamplePtr sample;
-				arrayProp.get(sample);
-
-				indices.resize(sample->size());
-				for (int j = 0; j < sample->size(); ++j) {
-					indices[j] = sample->get()[j];
-				}
-			}
-			else if (name == vals_name) {
-				foundVals = true;
-
-				Abc::IStringArrayProperty stringProp(prop.getParent(), prop.getName());
-				StringArraySamplePtr sample;
-				stringProp.get(sample);
-
-				vals.resize(sample->size());
-				for (int j = 0; j < sample->size(); ++j) {
-					vals[j] = sample->get()[j];
-				}
-			}
-		},
-			[](ICompoundProperty prop, std::string name) {}
-		);
-
-		if (foundVals == false || foundIndices == false) {
-			throw std::exception("key not found");
-		}
-
-		std::vector<std::string> expands(indices.size());
-		for (int i = 0; i < indices.size(); ++i) {
-			expands[i] = vals[indices[i]];
-		}
-
-		return expands;
-	}
 
 	inline std::vector<glm::dvec3> toVec3Array(V3fArraySamplePtr sample) {
 		std::vector<glm::dvec3> values(sample->size());
@@ -363,11 +312,6 @@ namespace rt {
 			std::map<std::string, std::vector<AttributeVariant>> primAttributes;
 
 			const int32_t *indices = IndicesSample->get();
-
-			std::vector<std::string> attribKeys;
-			for (auto it = attributes.begin(); it != attributes.end(); ++it) {
-				attribKeys.emplace_back(it->first);
-			}
 	
 			for (int i = 0; i < FaceCountsSample->size(); ++i) {
 				auto count = FaceCountsSample->get()[i];
