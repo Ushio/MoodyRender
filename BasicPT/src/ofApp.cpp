@@ -644,7 +644,7 @@ void ofApp::draw() {
 
 
 	if (_image.isAllocated() && _showImage) {
-		_image.draw(0, 0);
+		_image.draw(30, 30);
 	}
 
 	char buffer[256];

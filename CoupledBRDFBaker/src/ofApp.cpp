@@ -89,13 +89,13 @@ void bake_avg(const char *albedoFile, const char *dstName) {
 
 //--------------------------------------------------------------
 void ofApp::setup() {
-	 rt::Stopwatch sw;
-	 bake("albedo_specular_conductor", false);
-	 bake("albedo_specular_dielectrics", true);
-	 printf("done %f seconds\n", sw.elapsed());
+	 //rt::Stopwatch sw;
+	 //bake("albedo_specular_conductor", false);
+	 //bake("albedo_specular_dielectrics", true);
+	 //printf("done %f seconds\n", sw.elapsed());
 
 	 bake_avg("albedo_specular_conductor.bin", "albedo_specular_conductor_avg.bin");
-	 bake_avg("albedo_specular_dielectrics.bin", "albedo_specular_dielectrics_avg.bin");
+	 // bake_avg("albedo_specular_dielectrics.bin", "albedo_specular_dielectrics_avg.bin");
 
 	ofSetVerticalSync(false);
 

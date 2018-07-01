@@ -6,7 +6,6 @@
 
 #include <cereal/cereal.hpp>
 #include <cereal/types/vector.hpp>
-#include <cereal/archives/xml.hpp>
 #include <cereal/archives/portable_binary.hpp>
 
 #include <tbb/tbb.h>
@@ -99,6 +98,7 @@ namespace rt {
 				// alpha == 0 を回避するために i == 0 を回避する
 				double alpha = (double)std::max(i, 1) / (_alphaSize - 1);
 				set(i, evaluate(alpha));
+				printf("%.10f %.10f\n", alpha, get(i));
 			}
 		}
 

@@ -184,7 +184,7 @@ namespace rt {
 	class MicrofacetCoupledConductorMaterial : public IMaterial {
 	public:
 		bool useFresnel = true;
-		double alpha = 0.2;
+		double alpha = 0.5;
 
 		glm::dvec3 bxdf(const glm::dvec3 &wo, const glm::dvec3 &wi) const override {
 			double cos_term_wo = glm::dot(Ng, wo);
@@ -197,15 +197,23 @@ namespace rt {
 
 			glm::dvec3 h = glm::normalize(wi + wo);
 			double d = D_Beckmann(Ng, h, alpha);
-			// double g = G2_height_correlated_beckmann(wi, wo, h, Ng, alpha);
 			double g = G2_v_cavity(wi, wo, h, Ng);
 
 			double brdf_without_f = d * g / (4.0 * cos_term_wo * cos_term_wi);
 
 			glm::dvec3 brdf_spec = glm::dvec3(brdf_without_f);
 
-			glm::dvec3 eta(0.15557, 0.42415, 1.3821);
-			glm::dvec3 k(3.6024, 2.4721, 1.9155);
+			// R: 650nm
+			// G: 550nm
+			// B: 450nm
+
+			// gold
+			glm::dvec3 eta = glm::dvec3(0.15557, 0.42415, 1.3821);
+			glm::dvec3 k = glm::dvec3(3.6024, 2.4721, 1.9155);
+
+			// copper (Cu)
+			//glm::dvec3 eta = glm::dvec3(0.23780, 1.0066, 1.2404);
+			//glm::dvec3 k = glm::dvec3(3.6264, 2.5823, 2.3929);
 
 			if (useFresnel) {
 				double cosThetaFresnel = glm::dot(h, wo);
@@ -219,18 +227,31 @@ namespace rt {
 
 			glm::dvec3 kLambda = glm::dvec3(1.0);
 
+			double specularAlbedo = CoupledBRDFConductor::specularAvgAlbedo().sample(alpha);
 			if (useFresnel) {
-				kLambda = glm::dvec3(
-					fresnel_unpolarized(eta.r, k.r, 0.0),
-					fresnel_unpolarized(eta.g, k.g, 0.0),
-					fresnel_unpolarized(eta.b, k.b, 0.0)
+				glm::dvec3 F(
+					fresnel_avg(eta.r, k.r),
+					fresnel_avg(eta.g, k.g),
+					fresnel_avg(eta.b, k.b)
 				);
+				glm::dvec3 E = glm::dvec3(specularAlbedo);
+				glm::dvec3 ONE = glm::dvec3(1.0);
+				kLambda = E * F * F / (ONE - F * (ONE - E));
+				//kLambda = E * F / (ONE - F * (ONE - E));
+				// kLambda = F;
+
+				//double cosThetaFresnel = glm::dot(h, wo);
+				//kLambda = glm::dvec3(
+				//	fresnel_unpolarized(eta.r, k.r, cosThetaFresnel),
+				//	fresnel_unpolarized(eta.g, k.g, cosThetaFresnel),
+				//	fresnel_unpolarized(eta.b, k.b, cosThetaFresnel)
+				//);
 			}
 
 			glm::dvec3 brdf_diff = kLambda
 				* (1.0 - CoupledBRDFConductor::specularAlbedo().sample(alpha, cos_term_wo))
 				* (1.0 - CoupledBRDFConductor::specularAlbedo().sample(alpha, cos_term_wi))
-				/ (glm::pi<double>() * (1.0 - CoupledBRDFConductor::specularAvgAlbedo().sample(alpha)));
+				/ (glm::pi<double>() * (1.0 - specularAlbedo));
 
 			return brdf_spec + brdf_diff;
 		}
@@ -340,7 +361,7 @@ namespace rt {
 
 		HeitzConductorMaterial(double a):alpha(a) {
 			for (int i = 0; i < 3; ++i) {
-				_microsurfaceConductor[i] = std::shared_ptr<MicrosurfaceConductor>(new MicrosurfaceConductor(true, true, alpha, alpha));
+				_microsurfaceConductor[i] = std::shared_ptr<MicrosurfaceConductor>(new MicrosurfaceConductor(false, true, alpha, alpha));
 				_microsurfaceConductor[i]->n = eta[i];
 				_microsurfaceConductor[i]->k = k[i];
 			}
@@ -383,8 +404,18 @@ namespace rt {
 			return pdf_omega;
 		}
 	private:
-		glm::dvec3 eta = glm::dvec3(0.15557, 0.42415, 1.3821);
-		glm::dvec3 k = glm::dvec3(3.6024, 2.4721, 1.9155);
+		// R: 650nm
+		// G: 550nm
+		// B: 450nm
+
+		// gold
+		//glm::dvec3 eta = glm::dvec3(0.15557, 0.42415, 1.3821);
+		//glm::dvec3 k = glm::dvec3(3.6024, 2.4721, 1.9155);
+
+		// copper (Cu)
+		glm::dvec3 eta = glm::dvec3(0.23780, 1.0066, 1.2404);
+		glm::dvec3 k = glm::dvec3(3.6264, 2.5823, 2.3929);
+
 		double alpha = 1.0;
 		std::shared_ptr<MicrosurfaceConductor> _microsurfaceConductor[3];
 	};

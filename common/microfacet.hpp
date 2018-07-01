@@ -2,10 +2,13 @@
 
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
+
+#include "peseudo_random.hpp"
 #include "coordinate.hpp"
 #include "composite_simpson.hpp"
 #include "serializable_buffer.hpp"
 #include "value_prportional_sampler.hpp"
+#include "composite_simpson.hpp"
 
 namespace rt {
 	inline double chi_plus(double x) {
@@ -130,6 +133,53 @@ namespace rt {
 		}
 	};
 
+	double D_velvet(const glm::dvec3 &n, const glm::dvec3 &h, double r) {
+		double cosTheta = glm::dot(n, h);
+		if (cosTheta < 0.0) {
+			return 0.0;
+		}
+		double sinTheta = std::sqrt(1.0 - cosTheta * cosTheta);
+		return (2.0 + 1.0 / r) * std::pow(sinTheta, 1.0 / r) / (glm::pi<double>() * 2.0);
+	}
+
+	struct VCavityVelvetVisibleNormalSampler {
+		static glm::dvec3 sample(PeseudoRandom *random, double alpha, glm::dvec3 wo, glm::dvec3 Ng) {
+			double phi = random->uniform(0.0, glm::two_pi<double>());
+
+			glm::dvec3 omega_m;
+			{
+				double u = random->uniform();
+				double theta = std::asin(u * (alpha / (alpha * 2.0 + 1.0)));
+				double phi = random->uniform(0.0, glm::two_pi<double>());
+				omega_m = polar_to_cartesian(theta, phi);
+			}
+
+			// glm::dvec3 omega_m = BeckmannMicrosurfaceImportanceSampler::sample(random, alpha);
+			glm::dvec3 omega_m_dot = glm::dvec3(-omega_m.x, -omega_m.y, omega_m.z);
+
+			ArbitraryBRDFSpace basis(Ng);
+			glm::dvec3 wo_local = basis.globalToLocal(wo);
+
+			double visible = glm::max(glm::dot(wo_local, omega_m), 0.0);
+			double visible_dot = glm::max(glm::dot(wo_local, omega_m_dot), 0.0);
+			double u = visible_dot / (visible + visible_dot);
+
+			glm::dvec3 sample = random->uniform() < u ? omega_m_dot : omega_m;
+
+			glm::dvec3 h = basis.localToGlobal(sample);
+			glm::dvec3 wi = glm::reflect(-wo, h);
+			return wi;
+		}
+
+		// 裏面はサポートしない
+		static double pdf(glm::dvec3 sampled_wi, double alpha, glm::dvec3 wo, glm::dvec3 Ng) {
+			glm::dvec3 wm = glm::normalize(sampled_wi + wo);
+			double cosThetaO = glm::dot(wo, Ng);
+			return G1_v_cavity(wo, wm, Ng) * glm::max(glm::dot(wo, wm), 0.0) * D_velvet(Ng, wm, alpha) / (cosThetaO * (4.0 * glm::dot(sampled_wi, wm)));
+		}
+	};
+
+	// fresnel conductor
 	inline double fresnel_v(double n, double k, double cosTheta) {
 		double n2_add_k2 = n * n + k * k;
 		double numer = n2_add_k2 - 2.0 * n * cosTheta + cosTheta * cosTheta;
@@ -164,6 +214,18 @@ namespace rt {
 
 	inline double fresnel_shlick(double f0, double cosTheta) {
 		return f0 + (1.0 - f0) * std::pow(1.0 - cosTheta, 5);
+	}
+
+	// conductor fresnel avg
+	inline double fresnel_avg(double n, double k) {
+		//return rt::composite_simpson<double>([&](double theta) {
+		//	double cosTheta = std::cos(theta);
+		//	double sinTheta = std::sin(theta);
+		//	return 2.0 * fresnel_unpolarized(n, k, cosTheta) * cosTheta * sinTheta;
+		//}, 6, 0.0, glm::pi<double>() * 0.5);
+		return 2.0 * rt::composite_simpson<double>([&](double cosTheta) {
+			return fresnel_unpolarized(n, k, cosTheta) * cosTheta;
+		}, 10, 0.0, 1.0);
 	}
 
 
