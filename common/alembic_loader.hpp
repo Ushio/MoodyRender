@@ -125,8 +125,8 @@ namespace rt {
 		return expands;
 	}
 
-	inline std::map<std::string, std::vector<AttributeVariant>> arbGeomParamsAttributes(ICompoundProperty props) {
-		std::map<std::string, std::vector<AttributeVariant>> attributes;
+	inline std::vector<std::pair<std::string, std::vector<AttributeVariant>>> arbGeomParamsAttributes(ICompoundProperty props) {
+		std::vector<std::pair<std::string, std::vector<AttributeVariant>>> attributes;
 		try {
 			ICompoundProperty geom(props, ".geom");
 			ICompoundProperty arbGeomParams(geom, ".arbGeomParams");
@@ -142,11 +142,13 @@ namespace rt {
 					}
 					else if (propType == AbcA::PropertyType::kArrayProperty) {
 						auto valueProp = IArrayProperty(arbGeomParams, attributeHeader.getName());
-						attributes[attributeHeader.getName()] = readAttributes(valueProp);
+						attributes.emplace_back(attributeHeader.getName(), readAttributes(valueProp));
+						// attributes[attributeHeader.getName()] = readAttributes(valueProp);
 					}
 					else if (propType == AbcA::PropertyType::kCompoundProperty) {
 						auto valueProp = ICompoundProperty(arbGeomParams, attributeHeader.getName());
-						attributes[attributeHeader.getName()] = readAttributes(valueProp);
+						attributes.emplace_back(attributeHeader.getName(), readAttributes(valueProp));
+						// attributes[attributeHeader.getName()] = readAttributes(valueProp);
 					}
 				}
 				catch (std::exception &e) {
@@ -308,8 +310,13 @@ namespace rt {
 
 			// Attributesをパース、3角形ポリゴンにする関係で、アトリビュートの配列も調整する
 			ICompoundProperty props = polyMesh.getProperties();
-			auto attributes = arbGeomParamsAttributes(props);
-			std::map<std::string, std::vector<AttributeVariant>> primAttributes;
+			std::vector<std::pair<std::string, std::vector<AttributeVariant>>> attributes = arbGeomParamsAttributes(props);
+			std::vector<std::pair<std::string, std::vector<AttributeVariant>>> primAttributes;
+
+			primAttributes.resize(attributes.size());
+			for (int i = 0; i < attributes.size(); ++i) {
+				primAttributes[i].first = attributes[i].first;
+			}
 
 			const int32_t *indices = IndicesSample->get();
 	
@@ -323,15 +330,19 @@ namespace rt {
 					primitive[2] = indices[j - 1];
 					geometry.primitives.push_back(primitive);
 
-					for (auto it = attributes.begin(); it != attributes.end(); ++it) {
-						if (it->second.size() == FaceCountsSample->size()) {
-							primAttributes[it->first].emplace_back(it->second[i]);
+					for (int k = 0; k < attributes.size(); ++k) {
+						if (attributes[k].second.size() == FaceCountsSample->size()) {
+							primAttributes[k].second.emplace_back(attributes[k].second[i]);
 						}
 					}
 				}
 				indices += count;
 			}
-			geometry.primitiveAttributes = std::move(primAttributes);
+			
+			for (int i = 0; i < primAttributes.size(); ++i) {
+				auto key = primAttributes[i].first;
+				geometry.primitiveAttributes[key] = std::move(primAttributes[i].second);
+			}
 
 			scene.geometries.push_back(binding(geometry));
 		}
