@@ -228,12 +228,10 @@ namespace rt {
 		}, 10, 0.0, 1.0);
 	}
 
-
-	inline double CoupledBRDF_I(double theta, double alpha, std::function<double(double, double)> specularAlbedo) {
-		return rt::composite_simpson<double>([&](double xi) {
-			double cosTheta = std::cos(xi);
-			return (1.0 - specularAlbedo(alpha, cosTheta)) * cosTheta;
-		}, 128, 0.0, theta);
+	inline double CoupledBRDF_Proportional(double theta, double alpha, std::function<double(double, double)> specularAlbedo) {
+		double cosTheta = std::cos(theta);
+		double sinTheta = std::sin(theta);
+		return (1.0 - specularAlbedo(alpha, cosTheta)) * cosTheta * sinTheta;
 	}
 
 	class CoupledBRDFSampler {
@@ -249,7 +247,7 @@ namespace rt {
 
 				std::vector<double> values(kSampleBlockCount);
 				for (int j = 0; j < kSampleBlockCount; ++j) {
-					values[j] = CoupledBRDF_I(indexToTheta(j, kSampleBlockCount), alpha, specularAlbedo);
+					values[j] = CoupledBRDF_Proportional(indexToTheta(j, kSampleBlockCount), alpha, specularAlbedo);
 				}
 				_discreteSamplers[i] = ValueProportionalSampler<double>(values);
 			}

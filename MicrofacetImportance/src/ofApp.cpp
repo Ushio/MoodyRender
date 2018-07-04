@@ -57,8 +57,8 @@ void ofApp::setup(){
 	//	printf("[%d] alpha = %.5f / cosThetaO = %.5f  / %.5f\n", j, alpha, cosThetaO, integral);
 	//}
 
-	//rt::CoupledBRDFConductor::load(ofToDataPath("baked/albedo_specular_conductor.xml").c_str(), ofToDataPath("baked/albedo_specular_conductor_avg.xml").c_str());
-	//rt::CoupledBRDFDielectrics::load(ofToDataPath("baked/albedo_specular_dielectrics.xml").c_str(), ofToDataPath("baked/albedo_specular_dielectrics_avg.xml").c_str());
+	rt::CoupledBRDFConductor::load(ofToDataPath("baked/albedo_specular_conductor.bin").c_str(), ofToDataPath("baked/albedo_specular_conductor_avg.bin").c_str());
+	rt::CoupledBRDFDielectrics::load(ofToDataPath("baked/albedo_specular_dielectrics.bin").c_str(), ofToDataPath("baked/albedo_specular_dielectrics_avg.bin").c_str());
 
 	_camera.setNearClip(0.1);
 	_camera.setFarClip(100.0);
@@ -104,25 +104,58 @@ void ofApp::draw(){
 	ofSetColor(255, 0, 0);
 	ofDrawLine(glm::vec3(), glm::vec3(wo.x, wo.z, wo.y));
 
+	{
+
+	}
 	ofMesh mesh;
 	mesh.setMode(OF_PRIMITIVE_POINTS);
 	for (int i = 0; i < 3000; ++i) {
-		//double theta = CoupledBRDFConductor::sampler().sampleTheta(alpha, &random);
-		//glm::dvec3 sample = polar_to_cartesian(theta, random.uniform(0.0, glm::two_pi<double>()));
-		//ArbitraryBRDFSpace space(Ng);
-		//glm::dvec3 wi = space.localToGlobal(sample);
-
-		if (isVisibleNormal) {
-			glm::dvec3 wi = VCavityBeckmannVisibleNormalSampler::sample(&random, alpha, wo, Ng);
-			mesh.addVertex(glm::dvec3(wi.x, wi.z, wi.y));
-		}
-		else {
-			glm::dvec3 wi = BeckmannImportanceSampler::sample(&random, alpha, wo, Ng);
-			mesh.addVertex(glm::dvec3(wi.x, wi.z, wi.y));
-		}
+		double theta = CoupledBRDFConductor::sampler().sampleTheta(alpha, &random);
+		glm::dvec3 sample = polar_to_cartesian(theta, random.uniform(0.0, glm::two_pi<double>()));
+		ArbitraryBRDFSpace space(Ng);
+		glm::dvec3 wi = space.localToGlobal(sample);
+		mesh.addVertex(glm::dvec3(wi.x, wi.z, wi.y));
 	}
 	ofSetColor(255);
 	mesh.draw();
+
+	//{
+	//	ofPolyline line;
+	//	int N = 3000;
+	//	for (int i = 0; i < N; ++i) {
+	//		double theta = ofMap(i, 0, N - 1, 0, glm::two_pi<double>());
+	//		double cosTheta = cos(theta);
+	//		double sinTheta = sin(theta);
+	//		glm::dvec3 wi = glm::dvec3(sinTheta, 0.0, cosTheta);
+
+	//		double p = BeckmannImportanceSampler::pdf(wi, alpha, wo, Ng);
+	//		BeckmannImportanceSampler::pdf(wi, alpha, wo, Ng);
+
+	//		line.addVertex(glm::dvec3(wi.x, wi.z, wi.y) * p);
+	//	}
+	//	line.draw();
+	//}
+
+
+	//ofMesh mesh;
+	//mesh.setMode(OF_PRIMITIVE_POINTS);
+	//for (int i = 0; i < 3000; ++i) {
+	//	//double theta = CoupledBRDFConductor::sampler().sampleTheta(alpha, &random);
+	//	//glm::dvec3 sample = polar_to_cartesian(theta, random.uniform(0.0, glm::two_pi<double>()));
+	//	//ArbitraryBRDFSpace space(Ng);
+	//	//glm::dvec3 wi = space.localToGlobal(sample);
+
+	//	if (isVisibleNormal) {
+	//		glm::dvec3 wi = VCavityBeckmannVisibleNormalSampler::sample(&random, alpha, wo, Ng);
+	//		mesh.addVertex(glm::dvec3(wi.x, wi.z, wi.y));
+	//	}
+	//	else {
+	//		glm::dvec3 wi = BeckmannImportanceSampler::sample(&random, alpha, wo, Ng);
+	//		mesh.addVertex(glm::dvec3(wi.x, wi.z, wi.y));
+	//	}
+	//}
+	//ofSetColor(255);
+	//mesh.draw();
 
 	//double cosTheta = cos(theta);
 	//double sinTheta = sin(theta);

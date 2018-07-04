@@ -234,11 +234,11 @@ namespace rt {
 					fresnel_avg(eta.g, k.g),
 					fresnel_avg(eta.b, k.b)
 				);
-				glm::dvec3 E = glm::dvec3(specularAlbedo);
-				glm::dvec3 ONE = glm::dvec3(1.0);
-				kLambda = E * F * F / (ONE - F * (ONE - E));
+				//glm::dvec3 E = glm::dvec3(specularAlbedo);
+				//glm::dvec3 ONE = glm::dvec3(1.0);
+				//kLambda = E * F * F / (ONE - F * (ONE - E));
 				//kLambda = E * F / (ONE - F * (ONE - E));
-				// kLambda = F;
+				kLambda = F;
 
 				//double cosThetaFresnel = glm::dot(h, wo);
 				//kLambda = glm::dvec3(
@@ -268,7 +268,6 @@ namespace rt {
 				glm::dvec3 sample = polar_to_cartesian(theta, random->uniform(0.0, glm::two_pi<double>()));
 				ArbitraryBRDFSpace space(Ng);
 				return space.localToGlobal(sample);
-				// wi = LambertianSampler::sample(random, Ng);
 			}
 			return wi;
 		}
@@ -277,11 +276,13 @@ namespace rt {
 			double theta = std::acos(glm::dot(Ng, sampled_wi));
 
 			double spAlbedo = CoupledBRDFConductor::specularAlbedo().sample(alpha, glm::dot(Ng, wo));
+
+			int n = sampler.thetaSize(alpha);
+			double pDiscrete = sampler.probability(alpha, theta);
 			double pdf_omega =
 				spAlbedo * VCavityBeckmannVisibleNormalSampler::pdf(sampled_wi, alpha, wo, Ng)
 				+
-				(1.0 - spAlbedo) * (1.0 / glm::two_pi<double>()) * (sampler.thetaSize(alpha) * (2.0 / glm::pi<double>())) * sampler.probability(alpha, theta) / std::sin(theta);
-				// (1.0 - spAlbedo) * LambertianSampler::pdf(sampled_wi, Ng);
+				(1.0 - spAlbedo) * n / (glm::pi<double>() * glm::pi<double>() * std::sin(theta)) * pDiscrete;
 			return pdf_omega;
 		}
 	};
@@ -324,36 +325,7 @@ namespace rt {
 
 			return brdf_spec + brdf_diff;
 		}
-		//glm::dvec3 sample(PeseudoRandom *random, const glm::dvec3 &wo) const override {
-		//	glm::dvec3 wi;
-		//	double spAlbedo = CoupledBRDFDielectrics::specularAlbedo().sample(alpha, glm::dot(Ng, wo));
-
-		//	if (random->uniform() < spAlbedo) {
-		//		wi = VCavityBeckmannVisibleNormalSampler::sample(random, alpha, wo, Ng);
-		//	}
-		//	else {
-		//		double theta = CoupledBRDFDielectrics::sampler().sampleTheta(alpha, random);
-		//		glm::dvec3 sample = polar_to_cartesian(theta, random->uniform(0.0, glm::two_pi<double>()));
-		//		ArbitraryBRDFSpace space(Ng);
-		//		return space.localToGlobal(sample);
-		//	}
-		//	return wi;
-		//}
-		//double pdf(const glm::dvec3 &wo, const glm::dvec3 &sampled_wi) const override {
-		//	const CoupledBRDFSampler &sampler = CoupledBRDFDielectrics::sampler();
-		//	double theta = std::acos(glm::dot(Ng, sampled_wi));
-		//	double spAlbedo = CoupledBRDFDielectrics::specularAlbedo().sample(alpha, glm::dot(Ng, wo));
-
-		//	glm::dvec3 kLambda = Cd;
-		//	double k_avg = (kLambda[0] + kLambda[1] + kLambda[2]) / 3.0;
-		//	double P_spec = spAlbedo / (spAlbedo + k_avg * (1.0 - spAlbedo));
-
-		//	double pdf_omega =
-		//		spAlbedo * VCavityBeckmannVisibleNormalSampler::pdf(sampled_wi, alpha, wo, Ng)
-		//		+
-		//		(1.0 - spAlbedo) * (1.0 / glm::two_pi<double>()) * (sampler.thetaSize(alpha) * (2.0 / glm::pi<double>())) * sampler.probability(alpha, theta) / std::sin(theta);
-		//	return pdf_omega;
-		//}
+		
 		glm::dvec3 sample(PeseudoRandom *random, const glm::dvec3 &wo) const override {
 			glm::dvec3 wi;
 			double spAlbedo = CoupledBRDFDielectrics::specularAlbedo().sample(alpha, glm::dot(Ng, wo));
@@ -381,10 +353,12 @@ namespace rt {
 			double k_avg = (kLambda[0] + kLambda[1] + kLambda[2]) / 3.0;
 			double P_spec = spAlbedo / (spAlbedo + k_avg * (1.0 - spAlbedo));
 
+			int n = sampler.thetaSize(alpha);
+			double pDiscrete = sampler.probability(alpha, theta);
 			double pdf_omega =
 				P_spec * VCavityBeckmannVisibleNormalSampler::pdf(sampled_wi, alpha, wo, Ng)
 				+
-				(1.0 - P_spec) * (1.0 / glm::two_pi<double>()) * (sampler.thetaSize(alpha) * (2.0 / glm::pi<double>())) * sampler.probability(alpha, theta) / std::sin(theta);
+				(1.0 - P_spec) * n / (glm::pi<double>() * glm::pi<double>() * std::sin(theta)) * pDiscrete;
 			return pdf_omega;
 		}
 	};
