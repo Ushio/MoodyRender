@@ -138,10 +138,40 @@ namespace rt {
 		if (cosTheta < 0.0) {
 			return 0.0;
 		}
-		double sinTheta = std::sqrt(1.0 - cosTheta * cosTheta);
+		// double sinTheta = std::sqrt(1.0 - cosTheta * cosTheta);
+		double sinTheta = std::sin(std::acos(cosTheta));
 		return (2.0 + 1.0 / r) * std::pow(sinTheta, 1.0 / r) / (glm::pi<double>() * 2.0);
 	}
 
+	struct VelvetSampler {
+		// サンプリング範囲が半球ではないことに注意
+		static glm::dvec3 sample(PeseudoRandom *random, double alpha, glm::dvec3 wo, glm::dvec3 Ng) {
+			double phi = random->uniform(0.0, glm::two_pi<double>());
+
+			glm::dvec3 omega_m;
+			{
+				double u = random->uniform();
+				double theta = std::asin(u * (alpha / (alpha * 2.0 + 1.0)));
+				double phi = random->uniform(0.0, glm::two_pi<double>());
+				omega_m = polar_to_cartesian(theta, phi);
+			}
+			ArbitraryBRDFSpace basis(Ng);
+			return basis.localToGlobal(omega_m);
+			//ArbitraryBRDFSpace basis(Ng);
+			//glm::dvec3 h = basis.localToGlobal(omega_m);
+			//glm::dvec3 wi = glm::reflect(-wo, h);
+			//return wi;
+		}
+		// 裏面はサポートしない
+		static double pdf(glm::dvec3 sampled_wi, double alpha, glm::dvec3 wo, glm::dvec3 Ng) {
+			glm::dvec3 half = glm::normalize(sampled_wi + wo);
+			double pdf_m = D_velvet(Ng, half, alpha) * glm::dot(Ng, half);
+
+			// glm::dot(sampled_wi, half)が0になるのは、
+			// wiとwoが正反対の向き、つまりかならず裏側であるので、普段は問題にならない
+			return pdf_m / (4.0 * glm::dot(sampled_wi, half));
+		}
+	};
 	struct VCavityVelvetVisibleNormalSampler {
 		static glm::dvec3 sample(PeseudoRandom *random, double alpha, glm::dvec3 wo, glm::dvec3 Ng) {
 			double phi = random->uniform(0.0, glm::two_pi<double>());

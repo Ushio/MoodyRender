@@ -105,19 +105,43 @@ void ofApp::draw(){
 	ofDrawLine(glm::vec3(), glm::vec3(wo.x, wo.z, wo.y));
 
 	{
+		ofMesh mesh;
+		mesh.setMode(OF_PRIMITIVE_POINTS);
+		for (int i = 0; i < 3000; ++i) {
+			glm::dvec3 wi = VelvetSampler::sample(&random, alpha, wo, Ng);
+			mesh.addVertex(glm::dvec3(wi.x, wi.z, wi.y));
+		}
+		ofSetColor(255);
+		mesh.draw();
 
 	}
-	ofMesh mesh;
-	mesh.setMode(OF_PRIMITIVE_POINTS);
-	for (int i = 0; i < 3000; ++i) {
-		double theta = CoupledBRDFConductor::sampler().sampleTheta(alpha, &random);
-		glm::dvec3 sample = polar_to_cartesian(theta, random.uniform(0.0, glm::two_pi<double>()));
-		ArbitraryBRDFSpace space(Ng);
-		glm::dvec3 wi = space.localToGlobal(sample);
-		mesh.addVertex(glm::dvec3(wi.x, wi.z, wi.y));
+	{
+		ofPolyline line;
+		int N = 3000;
+		for (int i = 0; i < N; ++i) {
+			double theta = ofMap(i, 0, N - 1, 0, glm::two_pi<double>());
+			double cosTheta = cos(theta);
+			double sinTheta = sin(theta);
+			glm::dvec3 wi = glm::dvec3(sinTheta, 0.0, cosTheta);
+			// glm::dvec3 half = glm::normalize(wi + wo);
+			double p = D_velvet(Ng, wi, alpha);
+
+			line.addVertex(glm::dvec3(wi.x, wi.z, wi.y) * p);
+		}
+		line.draw();
 	}
-	ofSetColor(255);
-	mesh.draw();
+
+	//ofMesh mesh;
+	//mesh.setMode(OF_PRIMITIVE_POINTS);
+	//for (int i = 0; i < 3000; ++i) {
+	//	double theta = CoupledBRDFConductor::sampler().sampleTheta(alpha, &random);
+	//	glm::dvec3 sample = polar_to_cartesian(theta, random.uniform(0.0, glm::two_pi<double>()));
+	//	ArbitraryBRDFSpace space(Ng);
+	//	glm::dvec3 wi = space.localToGlobal(sample);
+	//	mesh.addVertex(glm::dvec3(wi.x, wi.z, wi.y));
+	//}
+	//ofSetColor(255);
+	//mesh.draw();
 
 	//{
 	//	ofPolyline line;

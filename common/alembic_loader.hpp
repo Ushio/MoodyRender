@@ -450,6 +450,7 @@ namespace rt {
 		const char *MicrofacetCoupledConductorMaterialString = "MicrofacetCoupledConductorMaterial";
 		const char *MicrofacetCoupledDielectricsMaterialString = "MicrofacetCoupledDielectricsMaterial";
 		const char *HeitzConductorMaterialString = "HeitzConductorMaterial";
+		const char *MicrofacetVelvetMaterialString = "MicrofacetVelvetMaterial";
 
 		auto rouphnessToAlpha = [](double rouphness) {
 			return rouphness * rouphness;
@@ -502,6 +503,15 @@ namespace rt {
 					alpha = rouphnessToAlpha(rouphness);
 				}
 				geom.primitives[primID].material = HeitzConductorMaterial(alpha);
+			}
+			else if (materialString == MicrofacetVelvetMaterialString) {
+				MicrofacetVelvetMaterial m;
+				double rouphness;
+				if (abcGeom.getAttribute("roughness", primID, &rouphness)) {
+					// m.alpha = rouphnessToAlpha(rouphness);
+					m.alpha = rouphness;
+				}
+				geom.primitives[primID].material = m;
 			}
 		};
 

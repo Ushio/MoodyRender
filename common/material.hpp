@@ -428,13 +428,62 @@ namespace rt {
 		std::shared_ptr<MicrosurfaceConductor> _microsurfaceConductor[3];
 	};
 
+	class MicrofacetVelvetMaterial : public IMaterial {
+	public:
+		bool useFresnel = false;
+		double alpha = 0.2;
+
+		glm::dvec3 bxdf(const glm::dvec3 &wo, const glm::dvec3 &wi) const override {
+			double cos_term_wo = glm::dot(Ng, wo);
+			double cos_term_wi = glm::dot(Ng, wi);
+
+			// chi_plus(glm::dot(Ng, omega_i)) * chi_plus(glm::dot(Ng, omega_o))
+			if (cos_term_wo <= 0.0 || cos_term_wi <= 0.0) {
+				return glm::dvec3();
+			}
+
+			glm::dvec3 h = glm::normalize(wi + wo);
+			double d = D_velvet(Ng, h, alpha);
+			// double g = G2_height_correlated_beckmann(wi, wo, h, Ng, alpha);
+			double g = G2_v_cavity(wi, wo, h, Ng);
+
+			double brdf_without_f = d * g / (4.0 * cos_term_wo * cos_term_wi);
+
+			glm::dvec3 brdf = glm::dvec3(brdf_without_f);
+
+			if (useFresnel) {
+				glm::dvec3 eta(0.15557, 0.42415, 1.3821);
+				glm::dvec3 k(3.6024, 2.4721, 1.9155);
+
+				double cosThetaFresnel = glm::dot(h, wo);
+				glm::dvec3 f = glm::dvec3(
+					fresnel_unpolarized(eta.r, k.r, cosThetaFresnel),
+					fresnel_unpolarized(eta.g, k.g, cosThetaFresnel),
+					fresnel_unpolarized(eta.b, k.b, cosThetaFresnel)
+				);
+				brdf = f * brdf_without_f;
+			}
+
+			return brdf;
+		}
+		glm::dvec3 sample(PeseudoRandom *random, const glm::dvec3 &wo) const override {
+			// return VCavityVelvetVisibleNormalSampler::sample(random, alpha, wo, Ng);
+			return UniformHemisphereSampler::sample(random, Ng);
+		}
+		double pdf(const glm::dvec3 &wo, const glm::dvec3 &sampled_wi) const override {
+			// return VCavityVelvetVisibleNormalSampler::pdf(sampled_wi, alpha, wo, Ng);
+			return UniformHemisphereSampler::pdf(sampled_wi, Ng);
+		}
+	};
+
 	typedef StackBasedPolymophicValue<IMaterial,
 		LambertianMaterial,
 		SpecularMaterial,
 		MicrofacetConductorMaterial,
 		MicrofacetCoupledConductorMaterial,
 		MicrofacetCoupledDielectricsMaterial,
-		HeitzConductorMaterial
+		HeitzConductorMaterial,
+		MicrofacetVelvetMaterial
 	> Material;
 
 }
