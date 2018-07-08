@@ -484,6 +484,11 @@ inline ofFloatPixels toOfLinear(const rt::Image &image) {
 std::shared_ptr<rt::Scene> scene;
 std::shared_ptr<rt::PTRenderer> renderer;
 
+bool isPowerOfTwo(uint32_t value)
+{
+	return value && !(value & (value - 1));
+}
+
 //--------------------------------------------------------------
 void ofApp::setup() {
 	_MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
@@ -595,24 +600,20 @@ void ofApp::draw() {
 		}
 	}
 
-
 	{
 		renderer->step();
 
 		if (ofGetFrameNum() % 5 == 0) {
 			_image.setFromPixels(toOf(renderer->_image));
 		}
-		if (renderer->stepCount() == 128) {
+		uint32_t n = renderer->stepCount();
+
+		if (128 <= n && isPowerOfTwo(n)) {
 			_image.setFromPixels(toOf(renderer->_image));
-			_image.save("128spp.png");
-		}
-		if (renderer->stepCount() == 512) {
-			_image.setFromPixels(toOf(renderer->_image));
-			_image.save("512spp.png");
-		}
-		if (renderer->stepCount() == 1024) {
-			_image.setFromPixels(toOf(renderer->_image));
-			_image.save("1024spp.png");
+			char name[64];
+			sprintf(name, "%dspp.png", n);
+			_image.save(name);
+			printf("elapsed %fs\n", ofGetElapsedTimef());
 		}
 	}
 
