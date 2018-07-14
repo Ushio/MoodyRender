@@ -9,6 +9,8 @@ namespace rt {
 	struct PeseudoRandom {
 		virtual ~PeseudoRandom() {}
 
+		/* double */
+
 		// 0.0 <= x < 1.0
 		virtual double uniform64f() = 0;
 
@@ -19,6 +21,21 @@ namespace rt {
 		// a <= x < b
 		double uniform(double a, double b) {
 			return glm::mix(a, b, uniform64f());
+		}
+
+		/* float */
+		// 0.0 <= x < 1.0
+		virtual float uniform32f() {
+			return uniform64f();
+		}
+
+		// 0.0 <= x < 1.0
+		float uniformf() {
+			return uniform32f();
+		}
+		// a <= x < b
+		float uniformf(float a, float b) {
+			return glm::mix(a, b, uniform32f());
 		}
 	};
 
@@ -48,6 +65,13 @@ namespace rt {
 			double value = *reinterpret_cast<double *>(&bits) - 1.0;
 			return value;
 		}
+		float uniform32f() override {
+			uint64_t x = next();
+			uint32_t bits = ((uint32_t)x >> 9) | 0x3f800000;
+			float value = *reinterpret_cast<float *>(&bits) - 1.0f;
+			return value;
+		}
+
 		uint64_t _x = 88172645463325252ULL;
 	};
 
@@ -73,7 +97,12 @@ namespace rt {
 			uint64_t bits = (0x3FFULL << 52) | (x >> 12);
 			return *reinterpret_cast<double *>(&bits) - 1.0;
 		}
-
+		float uniform32f() override {
+			uint64_t x = next();
+			uint32_t bits = ((uint32_t)x >> 9) | 0x3f800000;
+			float value = *reinterpret_cast<float *>(&bits) - 1.0f;
+			return value;
+		}
 		/* This is the jump function for the generator. It is equivalent
 		to 2^64 calls to next(); it can be used to generate 2^64
 		non-overlapping subsequences for parallel computations. */
