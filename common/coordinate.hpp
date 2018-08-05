@@ -10,7 +10,7 @@ namespace rt {
 		glm::dvec3 v = {
 			sinTheta * std::cos(phi),
 			sinTheta * std::sin(phi),
-			cos(theta)
+			std::cos(theta)
 		};
 		return v;
 	};

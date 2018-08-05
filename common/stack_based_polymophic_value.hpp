@@ -82,7 +82,7 @@ namespace rt {
 				_manager->copyConstruct(p(), rhs.cp());
 			}
 		}
-		StackBasedPolymophicValue(Self &&rhs) {
+		StackBasedPolymophicValue(Self &&rhs) noexcept {
 			_manager = rhs._manager;
 			if (_manager) {
 				_manager->copyConstruct(p(), rhs.cp());
