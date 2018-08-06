@@ -69,6 +69,7 @@ namespace rt {
 
 		// common member
 		glm::dvec3 Ng;
+		bool backside = false;
 
 		virtual bool isEmission() const {
 			return false;

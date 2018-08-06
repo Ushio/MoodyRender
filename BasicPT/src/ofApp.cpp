@@ -151,8 +151,18 @@ namespace rt {
 			const auto &prim = _scene->geometries[index].primitives[rayhit.hit.primID];
 			*material = prim.material;
 
-			(*material)->Ng = glm::normalize(glm::dvec3(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z));
+			glm::dvec3 Ng = glm::normalize(glm::dvec3(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z));
 
+			// 裏面
+			bool backside = false;
+			if (glm::dot(rd, Ng) > 0.0)
+			{
+				Ng = -Ng;
+				backside = true;
+			}
+
+			(*material)->Ng = Ng;
+			(*material)->backside = backside;
 			return true;
 		}
 
@@ -250,12 +260,6 @@ namespace rt {
 			glm::dvec3 wo = -rd;
 
 			if (scene.intersect(ro, rd, &m, &tmin)) {
-				// 後ほど対応は考えないとなぁ
-				// おそらく隙間からだろう
-				if (glm::dot(wo, m->Ng) < 0.0)
-				{
-					m->Ng = -m->Ng;
-				}
 
 				// NEE
 				//{

@@ -18,9 +18,6 @@ namespace rt {
 	> AttributeVariant;
 	
 	struct AlembicGeometry {
-		bool hasAttribute(const char *attribute) const {
-			return primitiveAttributes.count(attribute) != 0;
-		}
 		template <class T>
 		bool getAttribute(const char *attribute, int primID, T *value) const {
 			auto it = primitiveAttributes.find(attribute);
@@ -33,14 +30,6 @@ namespace rt {
 				}
 			}
 			return false;
-		}
-		template <class T>
-		T getAttributeOrDefault(const char *attribute, int primID, const T &defaultValue) const {
-			T value;
-			if (getAttribute(attribute, primID, &value)) {
-				return value;
-			}
-			return defaultValue;
 		}
 
 		std::vector<glm::dvec3> points;
@@ -79,7 +68,7 @@ namespace rt {
 		}
 	}
 
-	inline std::vector<AttributeVariant> readAttributes(IArrayProperty prop) {
+	inline std::vector<AttributeVariant> readAttributes(IArrayProperty prop, int compornentCount) {
 		auto dataType = prop.getDataType();
 		if (dataType.getExtent() == 3 && dataType.getPod() == kFloat32POD) {
 			Abc::IV3fArrayProperty arrayProp(prop.getParent(), prop.getName());
@@ -95,12 +84,28 @@ namespace rt {
 			Abc::IFloatArrayProperty arrayProp(prop.getParent(), prop.getName());
 			FloatArraySamplePtr sample;
 			arrayProp.get(sample);
-			std::vector<AttributeVariant> values(sample->size());
-			for (int j = 0; j < sample->size(); ++j) {
-				auto value = sample->get()[j];
-				values[j] = value;
+
+			// どうやらvectorの場合、要素数から割り出さないとだめなシチュエーションがあるらしい。
+			if (sample->size() == compornentCount) {
+				std::vector<AttributeVariant> values(sample->size());
+				for (int j = 0; j < sample->size(); ++j) {
+					auto value = sample->get()[j];
+					values[j] = value;
+				}
+				return values;
 			}
-			return values;
+			else if(sample->size() == compornentCount * 3) {
+				std::vector<AttributeVariant> values(sample->size());
+				for (int j = 0; j < compornentCount; ++j) {
+					int index = j * 3;
+					glm::dvec3 value = { sample->get()[index], sample->get()[index +1] , sample->get()[index +2] };
+					values[j] = value;
+				}
+				return values;
+			}
+			else {
+				throw std::exception();
+			}
 		}
 		else {
 			throw std::exception("unsupported dataType");
@@ -125,8 +130,9 @@ namespace rt {
 		return expands;
 	}
 
-	inline std::vector<std::pair<std::string, std::vector<AttributeVariant>>> arbGeomParamsAttributes(ICompoundProperty props) {
-		std::vector<std::pair<std::string, std::vector<AttributeVariant>>> attributes;
+	// エラーがあっても空っぽのまま返す
+	inline std::map<std::string, std::vector<AttributeVariant>> arbGeomParamsAttributes(ICompoundProperty props, int compornentCount) {
+		std::map<std::string, std::vector<AttributeVariant>> attributes;
 		try {
 			ICompoundProperty geom(props, ".geom");
 			ICompoundProperty arbGeomParams(geom, ".arbGeomParams");
@@ -142,13 +148,13 @@ namespace rt {
 					}
 					else if (propType == AbcA::PropertyType::kArrayProperty) {
 						auto valueProp = IArrayProperty(arbGeomParams, attributeHeader.getName());
-						attributes.emplace_back(attributeHeader.getName(), readAttributes(valueProp));
-						// attributes[attributeHeader.getName()] = readAttributes(valueProp);
+						// attributes.emplace_back(attributeHeader.getName(), readAttributes(valueProp));
+						attributes[attributeHeader.getName()] = readAttributes(valueProp, compornentCount);
 					}
 					else if (propType == AbcA::PropertyType::kCompoundProperty) {
 						auto valueProp = ICompoundProperty(arbGeomParams, attributeHeader.getName());
-						attributes.emplace_back(attributeHeader.getName(), readAttributes(valueProp));
-						// attributes[attributeHeader.getName()] = readAttributes(valueProp);
+						// attributes.emplace_back(attributeHeader.getName(), readAttributes(valueProp));
+						attributes[attributeHeader.getName()] = readAttributes(valueProp);
 					}
 				}
 				catch (std::exception &e) {
@@ -180,33 +186,7 @@ namespace rt {
 		return values;
 	}
 
-	inline std::vector<glm::dvec3> propertyArrayVec3(ICompoundProperty props, const char *dir) throw(std::exception) {
-		bool found = false;
-		std::vector<glm::dvec3> values;
-		visitProperties(props,
-			[](IScalarProperty prop, std::string name) {},
-			[&](IArrayProperty prop, std::string name) {
-			if (name == dir) {
-				Abc::IV3fArrayProperty arrayProp(prop.getParent(), prop.getName());
-				V3fArraySamplePtr sample;
-				arrayProp.get(sample);
-
-				found = true;
-				values.resize(sample->size());
-				for (int j = 0; j < sample->size(); ++j) {
-					auto value = sample->get()[j];
-					values[j] = glm::dvec3(value.x, value.y, value.z);
-				}
-			}
-		},
-			[](ICompoundProperty prop, std::string name) {}
-		);
-		if (found == false) {
-			throw std::exception("key not found");
-		}
-		return values;
-	}
-	inline double propertyScalarFloat(ICompoundProperty props, const char *dir) {
+	inline double propertyScalarFloat(ICompoundProperty props, const char *dir) throw(std::exception) {
 		bool found = false;
 		float value = 0.0f;
 		visitProperties(props,
@@ -259,7 +239,7 @@ namespace rt {
 		}
 	}
 
-	glm::dmat4 GetTransform(IObject o) {
+	inline glm::dmat4 GetTransform(IObject o) {
 		Abc::M44d m;
 		while (o) {
 			if (IXform::matches(o.getHeader())) {
@@ -276,75 +256,62 @@ namespace rt {
 		return matrix;
 	}
 
+	inline void parsePolyMesh(IPolyMesh &polyMesh, Scene &scene, std::function<Geometry(const AlembicGeometry&)> binding) throw (std::exception) {
+		IPolyMeshSchema &mesh = polyMesh.getSchema();
+
+		auto transform = GetTransform(polyMesh);
+
+		AlembicGeometry geometry;
+
+		// Parse Point
+		Abc::IP3fArrayProperty P = mesh.getPositionsProperty();
+		P3fArraySamplePtr PSample;
+		P.get(PSample);
+
+		geometry.points.resize(PSample->size());
+		for (int i = 0; i < PSample->size(); ++i) {
+			auto p = PSample->get()[i];
+			auto point = glm::dvec3(p.x, p.y, p.z);
+			point = transform * glm::dvec4(point, 1.0);
+			geometry.points[i] = glm::dvec3(point.x, point.y, point.z);
+		}
+
+		Abc::IInt32ArrayProperty FaceCounts = mesh.getFaceCountsProperty();
+		Int32ArraySamplePtr FaceCountsSample;
+		FaceCounts.get(FaceCountsSample);
+
+		Abc::IInt32ArrayProperty Indices = mesh.getFaceIndicesProperty();
+		Int32ArraySamplePtr IndicesSample;
+		Indices.get(IndicesSample);
+
+		for (int i = 0; i < FaceCountsSample->size(); ++i) {
+			auto count = FaceCountsSample->get()[i];
+			if (count != 3) {
+				throw std::exception("non triangle primitive found.");
+			}
+		}
+		const int32_t *indices = IndicesSample->get();
+		geometry.primitives.reserve(FaceCountsSample->size());
+		for (int i = 0; i < IndicesSample->size(); i += 3) {
+			geometry.primitives.emplace_back(indices[i], indices[i + 1], indices[i + 2]);
+		}
+
+		ICompoundProperty props = polyMesh.getProperties();
+		geometry.primitiveAttributes = arbGeomParamsAttributes(props, FaceCountsSample->size());
+
+		scene.geometries.push_back(binding(geometry));
+	}
 	inline void parseHierarchy(IObject o, Scene &scene, std::function<Geometry (const AlembicGeometry&)> binding) {
 		auto header = o.getHeader();
 
 		if (IPolyMesh::matches(header)) {
 			IPolyMesh polyMesh(o);
-			IPolyMeshSchema &mesh = polyMesh.getSchema();
-
-			auto transform = GetTransform(o);
-			
-			AlembicGeometry geometry;
-
-			// Parse Point
-			Abc::IP3fArrayProperty P = mesh.getPositionsProperty();
-			P3fArraySamplePtr PSample;
-			P.get(PSample);
-
-			geometry.points.resize(PSample->size());
-			for (int i = 0; i < PSample->size(); ++i) {
-				auto p = PSample->get()[i];
-				auto point = glm::dvec3(p.x, p.y, p.z);
-				point = transform * glm::dvec4(point, 1.0);
-				geometry.points[i] = glm::dvec3(point.x, point.y, point.z);
+			try {
+				parsePolyMesh(polyMesh, scene, binding);
 			}
-
-			Abc::IInt32ArrayProperty FaceCounts = mesh.getFaceCountsProperty();
-			Int32ArraySamplePtr FaceCountsSample;
-			FaceCounts.get(FaceCountsSample);
-
-			Abc::IInt32ArrayProperty Indices = mesh.getFaceIndicesProperty();
-			Int32ArraySamplePtr IndicesSample;
-			Indices.get(IndicesSample);
-
-			// Attributesをパース、3角形ポリゴンにする関係で、アトリビュートの配列も調整する
-			ICompoundProperty props = polyMesh.getProperties();
-			std::vector<std::pair<std::string, std::vector<AttributeVariant>>> attributes = arbGeomParamsAttributes(props);
-			std::vector<std::pair<std::string, std::vector<AttributeVariant>>> primAttributes;
-
-			primAttributes.resize(attributes.size());
-			for (int i = 0; i < attributes.size(); ++i) {
-				primAttributes[i].first = attributes[i].first;
+			catch (std::exception &e) {
+				printf("IPolyMesh parse error: %s", e.what());
 			}
-
-			const int32_t *indices = IndicesSample->get();
-	
-			for (int i = 0; i < FaceCountsSample->size(); ++i) {
-				auto count = FaceCountsSample->get()[i];
-
-				for (int j = 2; j < count; ++j) {
-					glm::ivec3 primitive;
-					primitive[0] = indices[0];
-					primitive[1] = indices[j];
-					primitive[2] = indices[j - 1];
-					geometry.primitives.push_back(primitive);
-
-					for (int k = 0; k < attributes.size(); ++k) {
-						if (attributes[k].second.size() == FaceCountsSample->size()) {
-							primAttributes[k].second.emplace_back(attributes[k].second[i]);
-						}
-					}
-				}
-				indices += count;
-			}
-			
-			for (int i = 0; i < primAttributes.size(); ++i) {
-				auto key = primAttributes[i].first;
-				geometry.primitiveAttributes[key] = std::move(primAttributes[i].second);
-			}
-
-			scene.geometries.push_back(binding(geometry));
 		}
 
 		if (ICamera::matches(header)) {
