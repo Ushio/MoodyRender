@@ -137,6 +137,12 @@ namespace rt {
 		const TBase *operator->() const {
 			return _manager->ptr(cp());
 		}
+		TBase *get() {
+			return _manager->ptr(p());
+		}
+		const TBase *get() const {
+			return _manager->ptr(cp());
+		}
 	private:
 		inline void *p() {
 			return static_cast<void *>(&_storage);

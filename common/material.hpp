@@ -67,9 +67,9 @@ namespace rt {
 	public:
 		virtual ~IMaterial() {}
 
-		// common member
+		// 幾何学法線
 		glm::dvec3 Ng;
-		bool backside = false;
+		bool backfacing = false;
 
 		virtual bool isEmission() const {
 			return false;
@@ -90,17 +90,35 @@ namespace rt {
 		virtual double pdf(const glm::dvec3 &wo, const glm::dvec3 &sampled_wi) const = 0;
 	};
 
+	struct NoSample {
+
+	};
+	struct AreaSample {
+		
+	};
+	struct SphericalRectangleSample {
+		int triangleIndex = 0;
+	};
+	typedef strict_variant::variant<NoSample, AreaSample, SphericalRectangleSample> SamplingStrategy;
+
+	// 現行ではLambertianMaterial だけがdoubleSlideを許可
 	class LambertianMaterial : public IMaterial {
 	public:
 		LambertianMaterial() :Le(0.0), R(1.0) {}
 		LambertianMaterial(glm::dvec3 e, glm::dvec3 r) : Le(e), R(r) {}
 		glm::dvec3 Le;
 		glm::dvec3 R;
+		bool backEmission = false;
+		SamplingStrategy samplingStrategy;
 
 		bool isEmission() const override {
 			return glm::any(glm::greaterThanEqual(Le, glm::dvec3(glm::epsilon<double>())));
 		}
 		glm::dvec3 emission(const glm::dvec3 &wo) const override {
+			glm::dvec3 n_orig = backfacing ? -Ng : Ng;
+			if (backEmission == false && glm::dot(n_orig, wo) < 0.0) {
+				return glm::dvec3(0.0);
+			}
 			return Le;
 		}
 		glm::dvec3 bxdf(const glm::dvec3 &wo, const glm::dvec3 &wi) const override {

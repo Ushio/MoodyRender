@@ -293,7 +293,8 @@ namespace rt {
 		const int32_t *indices = IndicesSample->get();
 		geometry.primitives.reserve(FaceCountsSample->size());
 		for (int i = 0; i < IndicesSample->size(); i += 3) {
-			geometry.primitives.emplace_back(indices[i], indices[i + 1], indices[i + 2]);
+			// houdini では順序が逆のようだ
+			geometry.primitives.emplace_back(indices[i], indices[i + 2], indices[i + 1]);
 		}
 
 		ICompoundProperty props = polyMesh.getProperties();
@@ -433,6 +434,26 @@ namespace rt {
 				LambertianMaterial m;
 				abcGeom.getAttribute("Le", primID, &m.Le);
 				abcGeom.getAttribute("Cd", primID, &m.R);
+
+				double backEmission = 0.0;
+				abcGeom.getAttribute("BackEmission", primID, &backEmission);
+				m.backEmission = 1.0e-9 < backEmission;
+
+				std::string samplingStrategy;
+				if (abcGeom.getAttribute<std::string>("SamplingStrategy", primID, &samplingStrategy)) {
+					if (samplingStrategy == "AreaSample") {
+						m.samplingStrategy = AreaSample();
+					}
+					else if (samplingStrategy == "SphericalRectangleSample") {
+						SphericalRectangleSample sphericalRectangleSample;
+						double triangleIndex = 0.0;
+						if (abcGeom.getAttribute("TriangleIndex", primID, &triangleIndex)) {
+							sphericalRectangleSample.triangleIndex = (int)std::round(triangleIndex);
+						}
+						m.samplingStrategy = sphericalRectangleSample;
+					}
+				}
+
 				geom.primitives[primID].material = m;
 			}
 			else if (materialString == MicrofacetConductorMaterialString) {

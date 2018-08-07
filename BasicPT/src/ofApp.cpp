@@ -154,15 +154,15 @@ namespace rt {
 			glm::dvec3 Ng = glm::normalize(glm::dvec3(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z));
 
 			// 裏面
-			bool backside = false;
+			bool backfacing = false;
 			if (glm::dot(rd, Ng) > 0.0)
 			{
 				Ng = -Ng;
-				backside = true;
+				backfacing = true;
 			}
 
 			(*material)->Ng = Ng;
-			(*material)->backside = backside;
+			(*material)->backfacing = backfacing;
 			return true;
 		}
 
@@ -295,6 +295,10 @@ namespace rt {
 				glm::dvec3 wi = m->sample(random, wo);
 				glm::dvec3 bxdf = m->bxdf(wo, wi);
 				glm::dvec3 emission = m->emission(wo);
+				if (i == 0 && emission.r > 0.1f) {
+					IMaterial *mmm = m.get();
+					printf("");
+				}
 				double pdf = m->pdf(wo, wi);
 				double cosTheta = std::abs(glm::dot(m->Ng, wi));
 
