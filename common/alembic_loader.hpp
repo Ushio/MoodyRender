@@ -445,12 +445,19 @@ namespace rt {
 						m.samplingStrategy = AreaSample();
 					}
 					else if (samplingStrategy == "SphericalRectangleSample") {
+						bool succeeded = true;
 						SphericalRectangleSample sphericalRectangleSample;
 						double triangleIndex = 0.0;
-						if (abcGeom.getAttribute("TriangleIndex", primID, &triangleIndex)) {
-							sphericalRectangleSample.triangleIndex = (int)std::round(triangleIndex);
+						succeeded = succeeded && abcGeom.getAttribute("TriangleIndex", primID, &triangleIndex);
+						sphericalRectangleSample.triangleIndex = (int)std::round(triangleIndex);
+
+						succeeded = succeeded && abcGeom.getAttribute("s", primID, &sphericalRectangleSample.s);
+						succeeded = succeeded && abcGeom.getAttribute("ex", primID, &sphericalRectangleSample.ex);
+						succeeded = succeeded && abcGeom.getAttribute("ey", primID, &sphericalRectangleSample.ey);
+
+						if (succeeded) {
+							m.samplingStrategy = sphericalRectangleSample;
 						}
-						m.samplingStrategy = sphericalRectangleSample;
 					}
 				}
 

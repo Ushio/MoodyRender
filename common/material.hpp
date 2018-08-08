@@ -71,10 +71,6 @@ namespace rt {
 		glm::dvec3 Ng;
 		bool backfacing = false;
 
-		virtual bool isEmission() const {
-			return false;
-		}
-
 		// evaluate emission
 		virtual glm::dvec3 emission(const glm::dvec3 &wo) const {
 			return glm::dvec3(0.0);
@@ -98,6 +94,9 @@ namespace rt {
 	};
 	struct SphericalRectangleSample {
 		int triangleIndex = 0;
+		glm::dvec3 s;
+		glm::dvec3 ex;
+		glm::dvec3 ey;
 	};
 	typedef strict_variant::variant<NoSample, AreaSample, SphericalRectangleSample> SamplingStrategy;
 
@@ -111,9 +110,10 @@ namespace rt {
 		bool backEmission = false;
 		SamplingStrategy samplingStrategy;
 
-		bool isEmission() const override {
+		bool isEmission() const {
 			return glm::any(glm::greaterThanEqual(Le, glm::dvec3(glm::epsilon<double>())));
 		}
+
 		glm::dvec3 emission(const glm::dvec3 &wo) const override {
 			glm::dvec3 n_orig = backfacing ? -Ng : Ng;
 			if (backEmission == false && glm::dot(n_orig, wo) < 0.0) {

@@ -18,6 +18,223 @@
 #define DEBUG_MODE 0
 
 namespace rt {
+	struct QuadPlane {
+		glm::dvec3 s;
+		glm::dvec3 ex;
+		glm::dvec3 ey;
+
+		glm::dvec3 sample(double u, double v) const {
+			return s + ex * u + ey * v;
+		}
+		double area() const {
+			return glm::length(ex) * glm::length(ey);
+		}
+		glm::dvec3 normal() const {
+			return glm::normalize(glm::cross(ex, ey));
+		}
+	};
+
+	class SphereAreaSampler {
+	public:
+		SphereAreaSampler(const QuadPlane &quadPlane, const glm::dvec3 &o) {
+			_o = o;
+
+			double exLength = glm::length(quadPlane.ex);
+			double eyLength = glm::length(quadPlane.ey);
+			_x = quadPlane.ex / exLength;
+			_y = quadPlane.ey / eyLength;
+			_z = glm::cross(_x, _y);
+
+			glm::dvec3 d = quadPlane.s - o;
+			_x0 = glm::dot(d, _x);
+			_y0 = glm::dot(d, _y);
+			_x1 = _x0 + exLength;
+			_y1 = _y0 + eyLength;
+
+			_z0 = glm::dot(d, _z);
+
+			// z flip
+			if (_z0 > 0.0) {
+				_z0 *= -1.0;
+				_z *= -1.0;
+			}
+
+			_v[0][0] = glm::vec3(_x0, _y0, _z0);
+			_v[0][1] = glm::vec3(_x0, _y1, _z0);
+			_v[1][0] = glm::vec3(_x1, _y0, _z0);
+			_v[1][1] = glm::vec3(_x1, _y1, _z0);
+
+			auto calculate_n = [](glm::vec3 a, glm::vec3 b) {
+				glm::vec3 c = glm::cross(a, b);
+				return glm::normalize(c);
+			};
+
+			_n[0] = calculate_n(_v[0][0], _v[1][0]);
+			_n[1] = calculate_n(_v[1][0], _v[1][1]);
+			_n[2] = calculate_n(_v[1][1], _v[0][1]);
+			_n[3] = calculate_n(_v[0][1], _v[0][0]);
+
+			_g[0] = std::acos(glm::dot(-_n[0], _n[1]));
+			_g[1] = std::acos(glm::dot(-_n[1], _n[2]));
+			_g[2] = std::acos(glm::dot(-_n[2], _n[3]));
+			_g[3] = std::acos(glm::dot(-_n[3], _n[0]));
+		}
+
+		double solidAngle() const {
+			return _g[0] + _g[1] + _g[2] + _g[3] - glm::two_pi<double>();
+		}
+
+		double minPhiU() const {
+			return -_g[2] - _g[3] + glm::two_pi<double>();
+		}
+		double maxPhiU() const {
+			return solidAngle() - _g[2] - _g[3] + glm::two_pi<double>();
+		}
+		glm::dvec3 sample(double u, double v) const {
+			double AQ = solidAngle();
+
+			double phi_u = u * AQ - _g[2] - _g[3] + glm::two_pi<double>();
+
+			auto safeSqrt = [](double x) {
+				return std::sqrt(std::max(x, 0.0));
+			};
+
+			double b0 = _n[0].z;
+			double b1 = _n[2].z;
+			double fu = (std::cos(phi_u) * b0 - b1) / std::sin(phi_u);
+			double cu = std::copysign(1.0, fu) / safeSqrt(fu * fu + b0 * b0);
+			double xu = -cu * _z0 / safeSqrt(1.0 - cu * cu);
+
+			double d = std::sqrt(xu * xu + _z0 * _z0);
+			double h0 = _y0 / std::sqrt(d * d + _y0 * _y0);
+			double h1 = _y1 / std::sqrt(d * d + _y1 * _y1);
+			double hv = glm::mix(h0, h1, v);
+			double yv = hv * d / safeSqrt(1.0 - hv * hv);
+			return _o + xu * _x + yv * _y + _z0 * _z;
+		}
+
+		glm::dvec3 _o;
+		glm::dvec3 _x;
+		glm::dvec3 _y;
+		glm::dvec3 _z;
+
+		// local coord : 
+		double _x0;
+		double _x1;
+		double _y0;
+		double _y1;
+		double _z0;
+
+		glm::dvec3 _v[2][2];
+		glm::dvec3 _n[4];
+		double _g[4];
+	};
+}
+
+namespace rt {
+	/*
+	片面の場合、サンプリングは迷わないが、法線により衝突判定は早期に棄却可能
+	両面ある場合、明示的なサンプリングする時、裏面をサンプリングするのは積分範囲の無駄であるので、
+	見えている方向だけをサンプリングできる。
+	*/
+	class IDirectSampler {
+	public:
+		virtual double pdf_area(glm::dvec3 o, glm::dvec3 p) const = 0;
+		virtual void sample(PeseudoRandom *random, glm::dvec3 o, glm::dvec3 *p, glm::dvec3 *n, glm::dvec3 *Le) const = 0;
+	};
+
+	class TriangleAreaSampler : public IDirectSampler {
+	public:
+		TriangleAreaSampler(glm::dvec3 a, glm::dvec3 b, glm::dvec3 c, bool doubleSided, glm::dvec3 Le)
+		:_a(a)
+		,_b(b)
+		,_c(c)
+		,_doubleSided(doubleSided)
+		,_Le(Le) {
+			_n = triangleNormal(_a, _b, _c);
+		}
+
+		virtual double pdf_area(glm::dvec3 o, glm::dvec3 p) const {
+			if (_doubleSided == false) {
+				glm::dvec3 d = p - o;
+				bool backfacing = 0.0 < glm::dot(d, _n);
+				if (backfacing) {
+					return 0.0;
+				}
+			}
+			return 1.0 / triangleArea(_a, _b, _c);
+		}
+		
+		virtual void sample(PeseudoRandom *random, glm::dvec3 o, glm::dvec3 *p, glm::dvec3 *n, glm::dvec3 *Le) const {
+			*p = uniform_on_triangle(random->uniform(), random->uniform()).evaluate(_a, _b, _c);
+
+			glm::dvec3 d = *p - o;
+			bool backfacing = 0.0 < glm::dot(d, _n);
+
+			if (_doubleSided) {
+				*n = backfacing ? -_n : _n;
+				*Le = _Le;
+			}
+			else {
+				*n = _n;
+				*Le = backfacing ? glm::dvec3(0.0) : _Le;
+			}
+		}
+	private:
+		glm::dvec3 _Le;
+		glm::dvec3 _a, _b, _c;
+		glm::dvec3 _n;
+		bool _doubleSided = false;
+	};
+	class SphericalRectangleSampler : public IDirectSampler {
+	public:
+		SphericalRectangleSampler(glm::dvec3 s, glm::dvec3 ex, glm::dvec3 ey, bool doubleSided, glm::dvec3 Le)
+		:_doubleSided(doubleSided)
+		,_Le(Le)
+		{
+			_q.s = s;
+			_q.ex = ex;
+			_q.ey = ey;
+			_n = glm::cross(ex, ey);
+		}
+		virtual void sample(PeseudoRandom *random, glm::dvec3 o, glm::dvec3 *p, glm::dvec3 *n, glm::dvec3 *Le) const
+		{
+			SphereAreaSampler sampler(_q, o);
+			*p = sampler.sample(random->uniform(), random->uniform());
+			glm::dvec3 d = *p - o;
+			bool backfacing = 0.0 < glm::dot(d, _n);
+
+			if (_doubleSided) {
+				*n = backfacing ? -_n : _n;
+				*Le = _Le;
+			}
+			else {
+				*n = _n;
+				*Le = backfacing ? glm::dvec3(0.0) : _Le;
+			}
+		}
+		virtual double pdf_area(glm::dvec3 o, glm::dvec3 p) const {
+			glm::dvec3 d = p - o;
+			bool backfacing = 0.0 < glm::dot(d, _n);
+			if (_doubleSided == false) {
+				if (backfacing) {
+					return 0.0;
+				}
+			}
+			glm::dvec3 n = backfacing ? -_n : _n;
+			double cosTheta = glm::abs(glm::dot(n, glm::normalize(d)));
+
+			SphereAreaSampler sampler(_q, o);
+			double pw = 1.0 / sampler.solidAngle();
+			return pw * cosTheta / glm::distance2(o, p);
+		}
+	private:
+		glm::dvec3 _Le;
+		glm::dvec3 _n;
+		bool _doubleSided = false;
+		QuadPlane _q;
+	};
+
 	inline void EmbreeErorrHandler(void* userPtr, RTCError code, const char* str) {
 		printf("Embree Error [%d] %s\n", code, str);
 	}
@@ -59,23 +276,31 @@ namespace rt {
 			rtcInitIntersectContext(&_context);
 
 
-			// Emission
 			for (int i = 0; i < _scene->geometries.size(); ++i) {
 				const Geometry& g = _scene->geometries[i];
 				for (int j = 0; j < g.primitives.size(); ++j) {
-					if (g.primitives[j].material->isEmission()) {
-						EmissivePrimitiveRef ref;
-						ref.geometeryIndex = i;
-						ref.primitiveIndex = j;
-						auto indices = g.primitives[j].indices;
-						ref.area = triArea(g.points[indices.x].P, g.points[indices.y].P, g.points[indices.z].P);
-						ref.Ng = triNg(g.points[indices.x].P, g.points[indices.y].P, g.points[indices.z].P, false);
-						_emissivePrimitives.push_back(ref);
+					const Geometry::Primitive &p = g.primitives[j];
+					const IMaterial *m = g.primitives[j].material.get();
+					const LambertianMaterial *lambertian = dynamic_cast<const LambertianMaterial *>(m);
+					if (lambertian && lambertian->isEmission()) {
+						if (auto sample = lambertian->samplingStrategy.get<AreaSample>()) {
+							auto a = g.points[p.indices[0]].P;
+							auto b = g.points[p.indices[1]].P;
+							auto c = g.points[p.indices[2]].P;
+							TriangleAreaSampler *sampler = new TriangleAreaSampler(a, b, c, lambertian->backEmission, lambertian->Le);
+							_directSamplers.emplace_back(sampler);
+						}
+						else if (auto sample = lambertian->samplingStrategy.get<SphericalRectangleSample>())
+						{
+							if (sample->triangleIndex == 0) {
+								SphericalRectangleSampler *sampler = new SphericalRectangleSampler(sample->s, sample->ex, sample->ey, lambertian->backEmission, lambertian->Le);
+								_directSamplers.emplace_back(sampler);
+							}
+						}
 					}
 				}
 			}
-			_emissionSampler = ValueProportionalSampler<double>(_emissivePrimitives, [](const EmissivePrimitiveRef& ref) { return ref.area; });
-		
+
 			RTCBounds bounds;
 			rtcGetSceneBounds(_embreeScene, &bounds);
 
@@ -170,19 +395,26 @@ namespace rt {
 			return _scene->camera;
 		}
 
-		void sampleEmissiveUniform(PeseudoRandom *random, glm::dvec3 *p, Material *m) const {
-			int index = _emissionSampler.sample(random);
-			auto prim = _emissivePrimitives[index];
-			const Geometry& g = _scene->geometries[prim.geometeryIndex];
-			auto material = g.primitives[prim.primitiveIndex].material;
-			auto indices = g.primitives[prim.primitiveIndex].indices;
+		//void sampleEmissiveUniform(PeseudoRandom *random, glm::dvec3 *p, Material *m) const {
+		//	int index = _emissionSampler.sample(random);
+		//	auto prim = _emissivePrimitives[index];
+		//	const Geometry& g = _scene->geometries[prim.geometeryIndex];
+		//	auto material = g.primitives[prim.primitiveIndex].material;
+		//	auto indices = g.primitives[prim.primitiveIndex].indices;
 
-			material->Ng = prim.Ng;
-			*m = material;
-			*p = uniform_on_triangle(random->uniform(), random->uniform()).evaluate(g.points[indices.x].P, g.points[indices.y].P, g.points[indices.z].P);
+		//	material->Ng = prim.Ng;
+		//	*m = material;
+		//	*p = uniform_on_triangle(random->uniform(), random->uniform()).evaluate(g.points[indices.x].P, g.points[indices.y].P, g.points[indices.z].P);
+		//}
+		//double emissiveArea() const {
+		//	return _emissionSampler.sumValue();
+		//}
+
+		std::vector<std::shared_ptr<IDirectSampler>>::const_iterator sampler_begin() const {
+			return _directSamplers.begin();
 		}
-		double emissiveArea() const {
-			return _emissionSampler.sumValue();
+		std::vector<std::shared_ptr<IDirectSampler>>::const_iterator sampler_end() const {
+			return _directSamplers.end();
 		}
 
 		std::shared_ptr<rt::Scene> _scene;
@@ -190,14 +422,16 @@ namespace rt {
 		RTCScene _embreeScene = nullptr;
 		mutable RTCIntersectContext _context;
 
-		struct EmissivePrimitiveRef {
-			int geometeryIndex;
-			int primitiveIndex;
-			double area;
-			glm::dvec3 Ng;
-		};
-		std::vector<EmissivePrimitiveRef> _emissivePrimitives;
-		ValueProportionalSampler<double> _emissionSampler;
+		//struct EmissivePrimitiveRef {
+		//	int geometeryIndex;
+		//	int primitiveIndex;
+		//	double area;
+		//	glm::dvec3 Ng;
+		//};
+		//std::vector<EmissivePrimitiveRef> _emissivePrimitives;
+		//ValueProportionalSampler<double> _emissionSampler;
+
+		std::vector<std::shared_ptr<IDirectSampler>> _directSamplers;
 
 		double _sceneAdaptiveEps = 0.0f;
 	};
@@ -249,6 +483,7 @@ namespace rt {
 		return cosThetaP * cosThetaQ / glm::distance2(p, q);
 	}
 
+#define ENABLE_NEE 1
 	inline glm::dvec3 radiance(const rt::SceneInterface &scene, glm::dvec3 ro, glm::dvec3 rd, PeseudoRandom *random) {
 		const double kSceneEPS = scene.adaptiveEps();
 
@@ -260,66 +495,51 @@ namespace rt {
 			glm::dvec3 wo = -rd;
 
 			if (scene.intersect(ro, rd, &m, &tmin)) {
-
+#if ENABLE_NEE
 				// NEE
-				//{
-				//	glm::dvec3 p = ro + rd * (double)tmin;
+				{
+					glm::dvec3 p = ro + rd * (double)tmin;
 
-				//	glm::dvec3 q;
-				//	Material sampledM;
-				//	scene.sampleEmissiveUniform(random, &q, &sampledM);
+					for (auto it = scene.sampler_begin(); it != scene.sampler_end(); ++it) {
+						glm::dvec3 q;
+						glm::dvec3 n;
+						glm::dvec3 Le;
+						(*it)->sample(random, p, &q, &n, &Le);
 
-				//	glm::dvec3 wi = glm::normalize(q - p);
-				//	glm::dvec3 emission = sampledM->emission(-wi);
+						glm::dvec3 wi = glm::normalize(q - p);
+						glm::dvec3 bxdf = m->bxdf(wo, wi);
+						double pdf_area = (*it)->pdf_area(p, q);
+						double cosThetaP = glm::abs(glm::dot(m->Ng, wi));
+						double cosThetaQ = glm::dot(n, -wi);
 
-				//	glm::dvec3 bxdf = m->bxdf(wo, wi);
-				//	double pdf_area = (1.0 / scene.emissiveArea());
+						double g = GTerm(p, cosThetaP, q, cosThetaQ);
 
-				//	double cosTheta = glm::dot(m->Ng, wi);
+						glm::dvec3 contribution = T * bxdf * Le * g;
 
-				//	double cosThetaP = glm::abs(glm::dot(m->Ng, wi));
-				//	double cosThetaQ = glm::dot(sampledM->Ng, -wi);
-
-				//	double g = GTerm(p, cosThetaP, q, cosThetaQ);
-
-				//	glm::dvec3 contribution = T * bxdf * emission * g;
-
-				//	/* 裏面は発光しない */
-				//	if (0.0 < cosThetaQ && glm::any(glm::greaterThanEqual(contribution, glm::dvec3(glm::epsilon<double>())))) {
-				//		if (scene.occluded(p + m->Ng * kSceneEPS, q + sampledM->Ng * kSceneEPS) == false) {
-				//			Lo += contribution / pdf_area;
-				//		}
-				//	}
-				//}
-
+						/* 裏面は発光しない */
+						// 0.0 < cosThetaQ && 
+						if (glm::any(glm::greaterThanEqual(contribution, glm::dvec3(glm::epsilon<double>())))) {
+							if (scene.occluded(p + m->Ng * kSceneEPS, q + n * kSceneEPS) == false) {
+								Lo += contribution / pdf_area;
+							}
+						}
+					}
+				}
+#endif
 				glm::dvec3 wi = m->sample(random, wo);
 				glm::dvec3 bxdf = m->bxdf(wo, wi);
 				glm::dvec3 emission = m->emission(wo);
-				if (i == 0 && emission.r > 0.1f) {
-					IMaterial *mmm = m.get();
-					printf("");
-				}
 				double pdf = m->pdf(wo, wi);
 				double cosTheta = std::abs(glm::dot(m->Ng, wi));
 
-				// MicrofacetConductorMaterial の ダメサンプルを数える
-				//if (m.get<MicrofacetConductorMaterial>()) {
-				//	static std::atomic<int> badSample = 0;
-				//	static std::atomic<int> numSample = 0;
-				//	if (glm::dot(m->Ng, wi) < 0.0) {
-				//		badSample++;
-				//	}
-				//	numSample++;
-				//	if (numSample % 100000 == 0) {
-				//		printf("bad sample %.2f%%\n", (double)badSample / numSample * 100.0);
-				//	}
-				//}
 
-				//if (i == 0) {
-				//	Lo += emission * T;
-				//}
+#if ENABLE_NEE
+				if (i == 0) {
+					Lo += emission * T;
+				}
+#else
 				Lo += emission * T;
-
+#endif
 				if (glm::any(glm::greaterThanEqual(bxdf, glm::dvec3(1.0e-6f)))) {
 					T *= bxdf * cosTheta / pdf;
 				}

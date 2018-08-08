@@ -6,12 +6,12 @@
 #include "peseudo_random.hpp"
 
 namespace rt {
-	inline glm::dvec3 triNg(const glm::dvec3 &v0, const glm::dvec3 &v1, const glm::dvec3 &v2, bool isback) {
+	inline glm::dvec3 triangleNormal(const glm::dvec3 &v0, const glm::dvec3 &v1, const glm::dvec3 &v2, bool isback) {
 		glm::dvec3 e1 = v1 - v0;
 		glm::dvec3 e2 = v2 - v0;
 		return glm::normalize(isback ? glm::cross(e2, e1) : glm::cross(e1, e2));
 	}
-	inline double triArea(const glm::dvec3 &p0, const glm::dvec3 &p1, const glm::dvec3 &p2) {
+	inline double triangleArea(const glm::dvec3 &p0, const glm::dvec3 &p1, const glm::dvec3 &p2) {
 		auto va = p0 - p1;
 		auto vb = p2 - p1;
 		return glm::length(glm::cross(va, vb)) * 0.5;
@@ -37,17 +37,17 @@ namespace rt {
 		return s;
 	}
 
-	inline glm::dvec3 uniform_on_unit_sphere(PeseudoRandom *random) {
-		glm::dvec3 d;
-		double sq = 0.0;
-		do {
-			d.x = random->uniform(-1.0, 1.0);
-			d.y = random->uniform(-1.0, 1.0);
-			d.z = random->uniform(-1.0, 1.0);
+	//inline glm::dvec3 uniform_on_unit_sphere(PeseudoRandom *random) {
+	//	glm::dvec3 d;
+	//	double sq = 0.0;
+	//	do {
+	//		d.x = random->uniform(-1.0, 1.0);
+	//		d.y = random->uniform(-1.0, 1.0);
+	//		d.z = random->uniform(-1.0, 1.0);
 
-			sq = glm::length2(d);
-		} while (sq < 0.0001 || 1.0 < sq);
-		d /= glm::sqrt(sq);
-		return d;
-	}
+	//		sq = glm::length2(d);
+	//	} while (sq < 0.0001 || 1.0 < sq);
+	//	d /= glm::sqrt(sq);
+	//	return d;
+	//}
 }
