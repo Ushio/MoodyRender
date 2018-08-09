@@ -18,45 +18,78 @@
 #define DEBUG_MODE 0
 
 namespace rt {
-	struct QuadPlane {
-		glm::dvec3 s;
-		glm::dvec3 ex;
-		glm::dvec3 ey;
-
+	struct Rectangle {
+		Rectangle() {}
+		Rectangle(glm::dvec3 s, glm::dvec3 ex, glm::dvec3 ey)
+		:_s(s)
+		,_ex(ex)
+		,_ey(ey) {
+			_exLength = glm::length(ex);
+			_eyLength = glm::length(ey);
+			_x = ex / _exLength;
+			_y = ey / _exLength;
+			_z = glm::cross(_x, _y);
+		}
 		glm::dvec3 sample(double u, double v) const {
-			return s + ex * u + ey * v;
+			return _s + _ex * u + _ey * v;
 		}
 		double area() const {
-			return glm::length(ex) * glm::length(ey);
+			return _exLength * _eyLength;
 		}
 		glm::dvec3 normal() const {
-			return glm::normalize(glm::cross(ex, ey));
+			return _z;
 		}
+		glm::dvec3 s() const {
+			return _s;
+		}
+		glm::dvec3 ex() const {
+			return _ex;
+		}
+		glm::dvec3 ey() const {
+			return _ey;
+		}
+		glm::dvec3 x() const {
+			return _x;
+		}
+		glm::dvec3 y() const {
+			return _y;
+		}
+		glm::dvec3 z() const {
+			return _z;
+		}
+		double exLength() const {
+			return _exLength;
+		}
+		double eyLength() const {
+			return _eyLength;
+		}
+		glm::dvec3 _s;
+		glm::dvec3 _ex;
+		glm::dvec3 _ey;
+		double _exLength = 0.0;
+		double _eyLength = 0.0;
+		glm::dvec3 _x;
+		glm::dvec3 _y;
+		glm::dvec3 _z;
 	};
 
-	class SphereAreaSampler {
+	class SphericalRectangleSamplerCoordinate {
 	public:
-		SphereAreaSampler(const QuadPlane &quadPlane, const glm::dvec3 &o) {
+		SphericalRectangleSamplerCoordinate(const Rectangle &rectangle, const glm::dvec3 &o):_rectangle(rectangle) {
 			_o = o;
 
-			double exLength = glm::length(quadPlane.ex);
-			double eyLength = glm::length(quadPlane.ey);
-			_x = quadPlane.ex / exLength;
-			_y = quadPlane.ey / eyLength;
-			_z = glm::cross(_x, _y);
+			glm::dvec3 d = rectangle.s() - o;
+			_x0 = glm::dot(d, rectangle.x());
+			_y0 = glm::dot(d, rectangle.y());
+			_z0 = glm::dot(d, rectangle.z());
 
-			glm::dvec3 d = quadPlane.s - o;
-			_x0 = glm::dot(d, _x);
-			_y0 = glm::dot(d, _y);
-			_x1 = _x0 + exLength;
-			_y1 = _y0 + eyLength;
-
-			_z0 = glm::dot(d, _z);
+			_x1 = _x0 + rectangle.exLength();
+			_y1 = _y0 + rectangle.eyLength();
 
 			// z flip
 			if (_z0 > 0.0) {
 				_z0 *= -1.0;
-				_z *= -1.0;
+				_rectangle._z *= -1.0;
 			}
 
 			_v[0][0] = glm::vec3(_x0, _y0, _z0);
@@ -110,13 +143,12 @@ namespace rt {
 			double h1 = _y1 / std::sqrt(d * d + _y1 * _y1);
 			double hv = glm::mix(h0, h1, v);
 			double yv = hv * d / safeSqrt(1.0 - hv * hv);
-			return _o + xu * _x + yv * _y + _z0 * _z;
+			return _o + xu * _rectangle.x() + yv * _rectangle.y() + _z0 * _rectangle.z();
 		}
 
+		Rectangle _rectangle;
+
 		glm::dvec3 _o;
-		glm::dvec3 _x;
-		glm::dvec3 _y;
-		glm::dvec3 _z;
 
 		// local coord : 
 		double _x0;
@@ -140,7 +172,7 @@ namespace rt {
 	class IDirectSampler {
 	public:
 		virtual double pdf_area(glm::dvec3 o, glm::dvec3 p) const = 0;
-		virtual void sample(PeseudoRandom *random, glm::dvec3 o, glm::dvec3 *p, glm::dvec3 *n, glm::dvec3 *Le) const = 0;
+		virtual void sample(PeseudoRandom *random, glm::dvec3 o, glm::dvec3 *p, glm::dvec3 *n, glm::dvec3 *Le, double *pdf_area) const = 0;
 	};
 
 	class TriangleAreaSampler : public IDirectSampler {
@@ -152,9 +184,11 @@ namespace rt {
 		,_doubleSided(doubleSided)
 		,_Le(Le) {
 			_n = triangleNormal(_a, _b, _c);
+			_one_over_area = 1.0 / triangleArea(_a, _b, _c);
 		}
 
 		virtual double pdf_area(glm::dvec3 o, glm::dvec3 p) const {
+			// 裏面はサンプリングされないため、確率密度は0
 			if (_doubleSided == false) {
 				glm::dvec3 d = p - o;
 				bool backfacing = 0.0 < glm::dot(d, _n);
@@ -162,10 +196,10 @@ namespace rt {
 					return 0.0;
 				}
 			}
-			return 1.0 / triangleArea(_a, _b, _c);
+			return _one_over_area;
 		}
 		
-		virtual void sample(PeseudoRandom *random, glm::dvec3 o, glm::dvec3 *p, glm::dvec3 *n, glm::dvec3 *Le) const {
+		virtual void sample(PeseudoRandom *random, glm::dvec3 o, glm::dvec3 *p, glm::dvec3 *n, glm::dvec3 *Le, double *pdf_area) const {
 			*p = uniform_on_triangle(random->uniform(), random->uniform()).evaluate(_a, _b, _c);
 
 			glm::dvec3 d = *p - o;
@@ -174,10 +208,14 @@ namespace rt {
 			if (_doubleSided) {
 				*n = backfacing ? -_n : _n;
 				*Le = _Le;
+				*pdf_area = _one_over_area;
 			}
 			else {
 				*n = _n;
 				*Le = backfacing ? glm::dvec3(0.0) : _Le;
+
+				// 裏面はサンプリングされないため、確率密度は0
+				*pdf_area = backfacing ? 0.0 : _one_over_area;
 			}
 		}
 	private:
@@ -185,54 +223,65 @@ namespace rt {
 		glm::dvec3 _a, _b, _c;
 		glm::dvec3 _n;
 		bool _doubleSided = false;
+		double _one_over_area = 0.0;
 	};
 	class SphericalRectangleSampler : public IDirectSampler {
 	public:
 		SphericalRectangleSampler(glm::dvec3 s, glm::dvec3 ex, glm::dvec3 ey, bool doubleSided, glm::dvec3 Le)
 		:_doubleSided(doubleSided)
 		,_Le(Le)
+		,_q(s, ex, ey)
 		{
-			_q.s = s;
-			_q.ex = ex;
-			_q.ey = ey;
-			_n = glm::cross(ex, ey);
+
 		}
-		virtual void sample(PeseudoRandom *random, glm::dvec3 o, glm::dvec3 *p, glm::dvec3 *n, glm::dvec3 *Le) const
+
+		virtual void sample(PeseudoRandom *random, glm::dvec3 o, glm::dvec3 *p, glm::dvec3 *n, glm::dvec3 *Le, double *pdf_area) const
 		{
-			SphereAreaSampler sampler(_q, o);
+			SphericalRectangleSamplerCoordinate sampler(_q, o);
 			*p = sampler.sample(random->uniform(), random->uniform());
 			glm::dvec3 d = *p - o;
-			bool backfacing = 0.0 < glm::dot(d, _n);
+			bool backfacing = 0.0 < glm::dot(d, _q.normal());
 
 			if (_doubleSided) {
-				*n = backfacing ? -_n : _n;
+				*n = backfacing ? -_q.normal() : _q.normal();
 				*Le = _Le;
 			}
 			else {
-				*n = _n;
+				*n = _q.normal();
 				*Le = backfacing ? glm::dvec3(0.0) : _Le;
+			}
+
+			if (_doubleSided == false && backfacing) {
+				*pdf_area = 0.0;
+			} else {
+				double dLength2 = glm::length2(d);
+				double cosTheta = glm::dot(-*n, d / std::sqrt(dLength2));
+				double pw = 1.0 / sampler.solidAngle();
+				*pdf_area = pw * cosTheta / dLength2;
 			}
 		}
 		virtual double pdf_area(glm::dvec3 o, glm::dvec3 p) const {
 			glm::dvec3 d = p - o;
-			bool backfacing = 0.0 < glm::dot(d, _n);
+			bool backfacing = 0.0 < glm::dot(d, _q.normal());
+
+			// 裏面はサンプリングされないため、確率密度は0
 			if (_doubleSided == false) {
 				if (backfacing) {
 					return 0.0;
 				}
 			}
-			glm::dvec3 n = backfacing ? -_n : _n;
-			double cosTheta = glm::abs(glm::dot(n, glm::normalize(d)));
+			SphericalRectangleSamplerCoordinate sampler(_q, o);
 
-			SphereAreaSampler sampler(_q, o);
+			glm::dvec3 n = backfacing ? -_q.normal() : _q.normal();
+			double dLength2 = glm::length2(d);
+			double cosTheta = glm::dot(-n, d / std::sqrt(dLength2));
 			double pw = 1.0 / sampler.solidAngle();
 			return pw * cosTheta / glm::distance2(o, p);
 		}
 	private:
 		glm::dvec3 _Le;
-		glm::dvec3 _n;
 		bool _doubleSided = false;
-		QuadPlane _q;
+		Rectangle _q;
 	};
 
 	inline void EmbreeErorrHandler(void* userPtr, RTCError code, const char* str) {
@@ -395,41 +444,20 @@ namespace rt {
 			return _scene->camera;
 		}
 
-		//void sampleEmissiveUniform(PeseudoRandom *random, glm::dvec3 *p, Material *m) const {
-		//	int index = _emissionSampler.sample(random);
-		//	auto prim = _emissivePrimitives[index];
-		//	const Geometry& g = _scene->geometries[prim.geometeryIndex];
-		//	auto material = g.primitives[prim.primitiveIndex].material;
-		//	auto indices = g.primitives[prim.primitiveIndex].indices;
-
-		//	material->Ng = prim.Ng;
-		//	*m = material;
-		//	*p = uniform_on_triangle(random->uniform(), random->uniform()).evaluate(g.points[indices.x].P, g.points[indices.y].P, g.points[indices.z].P);
-		//}
-		//double emissiveArea() const {
-		//	return _emissionSampler.sumValue();
-		//}
-
 		std::vector<std::shared_ptr<IDirectSampler>>::const_iterator sampler_begin() const {
 			return _directSamplers.begin();
 		}
 		std::vector<std::shared_ptr<IDirectSampler>>::const_iterator sampler_end() const {
 			return _directSamplers.end();
 		}
+		int samplerCount() const {
+			return _directSamplers.size();
+		}
 
 		std::shared_ptr<rt::Scene> _scene;
 		RTCDevice _embreeDevice = nullptr;
 		RTCScene _embreeScene = nullptr;
 		mutable RTCIntersectContext _context;
-
-		//struct EmissivePrimitiveRef {
-		//	int geometeryIndex;
-		//	int primitiveIndex;
-		//	double area;
-		//	glm::dvec3 Ng;
-		//};
-		//std::vector<EmissivePrimitiveRef> _emissivePrimitives;
-		//ValueProportionalSampler<double> _emissionSampler;
 
 		std::vector<std::shared_ptr<IDirectSampler>> _directSamplers;
 
@@ -500,15 +528,28 @@ namespace rt {
 				{
 					glm::dvec3 p = ro + rd * (double)tmin;
 
+					// 1 sample only
+					int samplerCount = scene.samplerCount();
+					int sample_index = (int)random->uniform(0.0, samplerCount);
+					sample_index = std::min(sample_index, samplerCount - 1);
+					double sampler_select_p = 1.0 / samplerCount;
+
 					for (auto it = scene.sampler_begin(); it != scene.sampler_end(); ++it) {
+						if (std::distance(scene.sampler_begin(), it) != sample_index) {
+							continue;
+						}
+
 						glm::dvec3 q;
 						glm::dvec3 n;
 						glm::dvec3 Le;
-						(*it)->sample(random, p, &q, &n, &Le);
+						double pdf_area = 0.0;
+						(*it)->sample(random, p, &q, &n, &Le, &pdf_area);
+
+						// 簡単なテスト
+						// if (std::abs(pdf_area - (*it)->pdf_area(p, q)) > 1.0e-6) { abort(); }
 
 						glm::dvec3 wi = glm::normalize(q - p);
 						glm::dvec3 bxdf = m->bxdf(wo, wi);
-						double pdf_area = (*it)->pdf_area(p, q);
 						double cosThetaP = glm::abs(glm::dot(m->Ng, wi));
 						double cosThetaQ = glm::dot(n, -wi);
 
@@ -520,7 +561,7 @@ namespace rt {
 						// 0.0 < cosThetaQ && 
 						if (glm::any(glm::greaterThanEqual(contribution, glm::dvec3(glm::epsilon<double>())))) {
 							if (scene.occluded(p + m->Ng * kSceneEPS, q + n * kSceneEPS) == false) {
-								Lo += contribution / pdf_area;
+								Lo += contribution / (pdf_area * sampler_select_p);
 							}
 						}
 					}
