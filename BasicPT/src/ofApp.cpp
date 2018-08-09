@@ -83,49 +83,79 @@ namespace rt {
 			_y0 = glm::dot(d, rectangle.y());
 			_z0 = glm::dot(d, rectangle.z());
 
-			_x1 = _x0 + rectangle.exLength();
-			_y1 = _y0 + rectangle.eyLength();
+			double exLen = rectangle.exLength();
+			double eyLen = rectangle.eyLength();
+			_x1 = _x0 + exLen;
+			_y1 = _y0 + eyLen;
 
 			// z flip
 			if (_z0 > 0.0) {
 				_z0 *= -1.0;
 				_rectangle._z *= -1.0;
 			}
+			/*
+				_v[0][0] = glm::vec3(_x0, _y0, _z0);
+				_v[0][1] = glm::vec3(_x0, _y1, _z0);
+				_v[1][0] = glm::vec3(_x1, _y0, _z0);
+				_v[1][1] = glm::vec3(_x1, _y1, _z0);
+			*/
+			/*
+				a.y * b.z - b.y * a.z,
+				a.z * b.x - b.z * a.x,
+				a.x * b.y - b.x * a.y
+			*/
+			// 外積を展開
+			double z0_exLen = _z0 * exLen;
+			double z0_exLen2 = z0_exLen * z0_exLen;
+			double z0_eyLen = _z0 * eyLen;
+			double z0_eyLen2 = z0_eyLen * z0_eyLen;
+			_n[0] = glm::dvec3(
+				0.0,
+				z0_exLen,
+				-exLen * _y0
+			);
+			_n[1] = glm::dvec3(
+				-z0_eyLen,
+				0.0,
+				_x1 * eyLen
+			);
+			_n[2] = glm::dvec3(
+				0.0,
+				-z0_exLen,
+				_y1 * exLen
+			);
+			_n[3] = glm::dvec3(
+				z0_eyLen,
+				0.0,
+				-_x0 * eyLen
+			);
 
-			_v[0][0] = glm::vec3(_x0, _y0, _z0);
-			_v[0][1] = glm::vec3(_x0, _y1, _z0);
-			_v[1][0] = glm::vec3(_x1, _y0, _z0);
-			_v[1][1] = glm::vec3(_x1, _y1, _z0);
+			// 必要なのは、zだけであるので、正規化はzだけ
+			_n[0].z /= std::sqrt(z0_exLen2 + _n[0].z * _n[0].z);
+			_n[1].z /= std::sqrt(z0_eyLen2 + _n[1].z * _n[1].z);
+			_n[2].z /= std::sqrt(z0_exLen2 + _n[2].z * _n[2].z);
+			_n[3].z /= std::sqrt(z0_eyLen2 + _n[3].z * _n[3].z);
 
-			auto calculate_n = [](glm::vec3 a, glm::vec3 b) {
-				glm::vec3 c = glm::cross(a, b);
-				return glm::normalize(c);
-			};
+			/*
+				_n[0].x == 0
+				_n[1].y == 0
+				_n[2].x == 0
+				_n[3].y == 0
+				であるため、z成分だけで良い
+			*/
+			_g[0] = std::acos(-_n[0].z * _n[1].z);
+			_g[1] = std::acos(-_n[1].z * _n[2].z);
+			_g[2] = std::acos(-_n[2].z * _n[3].z);
+			_g[3] = std::acos(-_n[3].z * _n[0].z);
 
-			_n[0] = calculate_n(_v[0][0], _v[1][0]);
-			_n[1] = calculate_n(_v[1][0], _v[1][1]);
-			_n[2] = calculate_n(_v[1][1], _v[0][1]);
-			_n[3] = calculate_n(_v[0][1], _v[0][0]);
-
-			_g[0] = std::acos(glm::dot(-_n[0], _n[1]));
-			_g[1] = std::acos(glm::dot(-_n[1], _n[2]));
-			_g[2] = std::acos(glm::dot(-_n[2], _n[3]));
-			_g[3] = std::acos(glm::dot(-_n[3], _n[0]));
+			_sr = _g[0] + _g[1] + _g[2] + _g[3] - glm::two_pi<double>();
 		}
 
 		double solidAngle() const {
-			return _g[0] + _g[1] + _g[2] + _g[3] - glm::two_pi<double>();
-		}
-
-		double minPhiU() const {
-			return -_g[2] - _g[3] + glm::two_pi<double>();
-		}
-		double maxPhiU() const {
-			return solidAngle() - _g[2] - _g[3] + glm::two_pi<double>();
+			return _sr;
 		}
 		glm::dvec3 sample(double u, double v) const {
-			double AQ = solidAngle();
-
+			double AQ = _sr;
 			double phi_u = u * AQ - _g[2] - _g[3] + glm::two_pi<double>();
 
 			auto safeSqrt = [](double x) {
@@ -135,12 +165,13 @@ namespace rt {
 			double b0 = _n[0].z;
 			double b1 = _n[2].z;
 			double fu = (std::cos(phi_u) * b0 - b1) / std::sin(phi_u);
-			double cu = std::copysign(1.0, fu) / safeSqrt(fu * fu + b0 * b0);
+			double cu = std::copysign(1.0, fu) / std::sqrt(fu * fu + b0 * b0);
 			double xu = -cu * _z0 / safeSqrt(1.0 - cu * cu);
 
 			double d = std::sqrt(xu * xu + _z0 * _z0);
-			double h0 = _y0 / std::sqrt(d * d + _y0 * _y0);
-			double h1 = _y1 / std::sqrt(d * d + _y1 * _y1);
+			double d2 = d * d;
+			double h0 = _y0 / std::sqrt(d2 + _y0 * _y0);
+			double h1 = _y1 / std::sqrt(d2 + _y1 * _y1);
 			double hv = glm::mix(h0, h1, v);
 			double yv = hv * d / safeSqrt(1.0 - hv * hv);
 			return _o + xu * _rectangle.x() + yv * _rectangle.y() + _z0 * _rectangle.z();
@@ -150,14 +181,14 @@ namespace rt {
 
 		glm::dvec3 _o;
 
-		// local coord : 
 		double _x0;
 		double _x1;
 		double _y0;
 		double _y1;
 		double _z0;
 
-		glm::dvec3 _v[2][2];
+		double _sr;
+
 		glm::dvec3 _n[4];
 		double _g[4];
 	};
