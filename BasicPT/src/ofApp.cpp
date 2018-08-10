@@ -105,36 +105,65 @@ namespace rt {
 				a.x * b.y - b.x * a.y
 			*/
 			// 外積を展開
-			double z0_exLen = _z0 * exLen;
-			double z0_exLen2 = z0_exLen * z0_exLen;
-			double z0_eyLen = _z0 * eyLen;
-			double z0_eyLen2 = z0_eyLen * z0_eyLen;
+			//double z0_exLen = _z0 * exLen;
+			//double z0_exLen2 = z0_exLen * z0_exLen;
+			//double z0_eyLen = _z0 * eyLen;
+			//double z0_eyLen2 = z0_eyLen * z0_eyLen;
+			//_n[0] = glm::dvec3(
+			//	0.0,
+			//	z0_exLen,
+			//	-exLen * _y0
+			//);
+			//_n[1] = glm::dvec3(
+			//	-z0_eyLen,
+			//	0.0,
+			//	_x1 * eyLen
+			//);
+			//_n[2] = glm::dvec3(
+			//	0.0,
+			//	-z0_exLen,
+			//	_y1 * exLen
+			//);
+			//_n[3] = glm::dvec3(
+			//	z0_eyLen,
+			//	0.0,
+			//	-_x0 * eyLen
+			//);
+			// 必要なのは、zだけであるので、正規化はzだけ
+			//_n[0].z /= std::sqrt(z0_exLen2 + _n[0].z * _n[0].z);
+			//_n[1].z /= std::sqrt(z0_eyLen2 + _n[1].z * _n[1].z);
+			//_n[2].z /= std::sqrt(z0_exLen2 + _n[2].z * _n[2].z);
+			//_n[3].z /= std::sqrt(z0_eyLen2 + _n[3].z * _n[3].z);
+			// 定数倍なのだから、係数を掛ける必要が無い
+			_z0z0 = _z0 * _z0;
+			_y1y1 = _y1 * _y1;
 			_n[0] = glm::dvec3(
 				0.0,
-				z0_exLen,
-				-exLen * _y0
+				_z0,
+				-_y0
 			);
 			_n[1] = glm::dvec3(
-				-z0_eyLen,
+				-_z0,
 				0.0,
-				_x1 * eyLen
+				_x1
 			);
 			_n[2] = glm::dvec3(
 				0.0,
-				-z0_exLen,
-				_y1 * exLen
+				-_z0,
+				_y1
 			);
 			_n[3] = glm::dvec3(
-				z0_eyLen,
+				_z0,
 				0.0,
-				-_x0 * eyLen
+				-_x0
 			);
 
 			// 必要なのは、zだけであるので、正規化はzだけ
-			_n[0].z /= std::sqrt(z0_exLen2 + _n[0].z * _n[0].z);
-			_n[1].z /= std::sqrt(z0_eyLen2 + _n[1].z * _n[1].z);
-			_n[2].z /= std::sqrt(z0_exLen2 + _n[2].z * _n[2].z);
-			_n[3].z /= std::sqrt(z0_eyLen2 + _n[3].z * _n[3].z);
+			_y0y0 = _y0 * _y0;
+			_n[0].z /= std::sqrt(_z0z0 + _y0y0);
+			_n[1].z /= std::sqrt(_z0z0 + _x1 * _x1);
+			_n[2].z /= std::sqrt(_z0z0 + _y1y1);
+			_n[3].z /= std::sqrt(_z0z0 + _x0 * _x0);
 
 			/*
 				_n[0].x == 0
@@ -168,10 +197,10 @@ namespace rt {
 			double cu = std::copysign(1.0, fu) / std::sqrt(fu * fu + b0 * b0);
 			double xu = -cu * _z0 / safeSqrt(1.0 - cu * cu);
 
-			double d = std::sqrt(xu * xu + _z0 * _z0);
+			double d = std::sqrt(xu * xu + _z0z0);
 			double d2 = d * d;
-			double h0 = _y0 / std::sqrt(d2 + _y0 * _y0);
-			double h1 = _y1 / std::sqrt(d2 + _y1 * _y1);
+			double h0 = _y0 / std::sqrt(d2 + _y0y0);
+			double h1 = _y1 / std::sqrt(d2 + _y1y1);
 			double hv = glm::mix(h0, h1, v);
 			double yv = hv * d / safeSqrt(1.0 - hv * hv);
 			return _o + xu * _rectangle.x() + yv * _rectangle.y() + _z0 * _rectangle.z();
@@ -186,6 +215,10 @@ namespace rt {
 		double _y0;
 		double _y1;
 		double _z0;
+
+		double _z0z0;
+		double _y0y0;
+		double _y1y1;
 
 		double _sr;
 
