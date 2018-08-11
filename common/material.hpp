@@ -76,6 +76,9 @@ namespace rt {
 		virtual glm::dvec3 emission(const glm::dvec3 &wo) const {
 			return glm::dvec3(0.0);
 		}
+		virtual const IDirectSampler *direct_sampler() const {
+			return nullptr;
+		}
 
 		// evaluate bxdf
 		virtual glm::dvec3 bxdf(const glm::dvec3 &wo, const glm::dvec3 &wi) const = 0;
@@ -110,11 +113,14 @@ namespace rt {
 		glm::dvec3 R;
 		bool backEmission = false;
 		SamplingStrategy samplingStrategy;
+		IDirectSampler *sampler = nullptr;
 
 		bool isEmission() const {
 			return glm::any(glm::greaterThanEqual(Le, glm::dvec3(glm::epsilon<double>())));
 		}
-
+		virtual const IDirectSampler *direct_sampler() const override {
+			return sampler;
+		}
 		glm::dvec3 emission(const glm::dvec3 &wo) const override {
 			glm::dvec3 n_orig = backfacing ? -Ng : Ng;
 			if (backEmission == false && glm::dot(n_orig, wo) < 0.0) {

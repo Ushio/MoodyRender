@@ -65,24 +65,33 @@ namespace rt {
 
 
 			for (int i = 0; i < _scene->geometries.size(); ++i) {
-				const Geometry& g = _scene->geometries[i];
+				Geometry& g = _scene->geometries[i];
+				SphericalRectangleSampler *previous_sr_sampler = nullptr;
+
 				for (int j = 0; j < g.primitives.size(); ++j) {
-					const Geometry::Primitive &p = g.primitives[j];
-					const IMaterial *m = g.primitives[j].material.get();
-					const LambertianMaterial *lambertian = dynamic_cast<const LambertianMaterial *>(m);
+					Geometry::Primitive &p = g.primitives[j];
+					IMaterial *m = g.primitives[j].material.get();
+					LambertianMaterial *lambertian = dynamic_cast<LambertianMaterial *>(m);
 					if (lambertian && lambertian->isEmission()) {
 						if (auto sample = lambertian->samplingStrategy.get<AreaSample>()) {
 							auto a = g.points[p.indices[0]].P;
 							auto b = g.points[p.indices[1]].P;
 							auto c = g.points[p.indices[2]].P;
 							TriangleAreaSampler *sampler = new TriangleAreaSampler(a, b, c, lambertian->backEmission, lambertian->Le);
+							lambertian->sampler = sampler;
 							_directSamplers.emplace_back(sampler);
 						}
 						else if (auto sample = lambertian->samplingStrategy.get<SphericalRectangleSample>())
 						{
+							// あまり綺麗ではないが、triangleIndex 0, 1, 0, 1...となる決まりにする。
 							if (sample->triangleIndex == 0) {
 								SphericalRectangleSampler *sampler = new SphericalRectangleSampler(sample->s, sample->ex, sample->ey, lambertian->backEmission, lambertian->Le);
+								previous_sr_sampler = sampler;
+								lambertian->sampler = sampler;
 								_directSamplers.emplace_back(sampler);
+							}
+							else {
+								lambertian->sampler = previous_sr_sampler;
 							}
 						}
 					}
@@ -183,10 +192,10 @@ namespace rt {
 			return _scene->camera;
 		}
 
-		std::vector<std::shared_ptr<IDirectSampler>>::const_iterator sampler_begin() const {
+		std::vector<std::unique_ptr<IDirectSampler>>::const_iterator sampler_begin() const {
 			return _directSamplers.begin();
 		}
-		std::vector<std::shared_ptr<IDirectSampler>>::const_iterator sampler_end() const {
+		std::vector<std::unique_ptr<IDirectSampler>>::const_iterator sampler_end() const {
 			return _directSamplers.end();
 		}
 		int samplerCount() const {
@@ -198,7 +207,7 @@ namespace rt {
 		RTCScene _embreeScene = nullptr;
 		mutable RTCIntersectContext _context;
 
-		std::vector<std::shared_ptr<IDirectSampler>> _directSamplers;
+		std::vector<std::unique_ptr<IDirectSampler>> _directSamplers;
 
 		double _sceneAdaptiveEps = 0.0f;
 	};
