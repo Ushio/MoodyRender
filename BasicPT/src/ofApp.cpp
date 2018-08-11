@@ -170,7 +170,8 @@ namespace rt {
 			*tmin = rayhit.ray.tfar;
 			
 			int index = rayhit.hit.geomID;
-			const auto &prim = _scene->geometries[index].primitives[rayhit.hit.primID];
+			const auto &geom = _scene->geometries[index];
+			const auto &prim = geom.primitives[rayhit.hit.primID];
 			*material = prim.material;
 
 			glm::dvec3 Ng = glm::normalize(glm::dvec3(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z));
@@ -185,6 +186,18 @@ namespace rt {
 
 			(*material)->Ng = Ng;
 			(*material)->backfacing = backfacing;
+
+			double u = rayhit.hit.u;
+			double v = rayhit.hit.v;
+			/*
+			https://embree.github.io/api.html
+			t_uv = (1-u-v)*t0 + u*t1 + v*t2
+				 = t0 + u*(t1-t0) + v*(t2-t0)
+			*/
+			auto v0 = geom.points[prim.indices[0]].P;
+			auto v1 = geom.points[prim.indices[1]].P;
+			auto v2 = geom.points[prim.indices[2]].P;
+			(*material)->p = (1.0 - u - v) * v0 + u * v1 + v * v2;
 			return true;
 		}
 
@@ -263,13 +276,38 @@ namespace rt {
 		return glm::any(glm::greaterThanEqual(c, glm::dvec3(eps)));
 	}
 
+	///*
+	//i = 0, p(0) = 1
+	//i = 1, p(1) = exp(-1/k)
+	//i = 2, p(2) = exp(-2/k)
+	//*/
+	//inline double russian_roulette_p(int i, double k = 40.0) {
+	//	return std::exp(-double(i) / k);
+	//}
+
+	///*
+	//i = 0, p(0) = 1
+	//i = 1, p(0) * p(1) = p(-1/k)
+	//i = 2, p(0) * p(1) * p(2) = p(-1/p) * p(-2/k) = exp(-3/k)
+	//*/
+	//inline double russian_roulette_p_cumulative(int i, double k = 40.0) {
+	//	int sum = i * (1 + i) / 2;
+	//	return std::exp(-double(sum) / k);
+	//}
+
 #define ENABLE_NEE 1
+#define ENABLE_NEE_MIS 1
 	inline glm::dvec3 radiance(const rt::SceneInterface &scene, glm::dvec3 ro, glm::dvec3 rd, PeseudoRandom *random) {
 		const double kSceneEPS = scene.adaptiveEps();
+		const double kValueEPS = 1.0e-6;
 
 		glm::dvec3 Lo;
 		glm::dvec3 T(1.0);
-		for (int i = 0; i < 10; ++i) {
+		Material previous_m;
+		double previous_pdf = 0.0;
+
+		constexpr int kDepth = 10;
+		for (int i = 0; i < kDepth; ++i) {
 			Material m;
 			float tmin = 0.0f;
 			glm::dvec3 wo = -rd;
@@ -277,20 +315,10 @@ namespace rt {
 			if (scene.intersect(ro, rd, &m, &tmin)) {
 #if ENABLE_NEE
 				// NEE
-				{
+				// 最後のNEEは、PTと経路長をあわせるために、やらない
+				if(i != (kDepth - 1)) {
 					glm::dvec3 p = ro + rd * (double)tmin;
-
-					// 1 sample only
-					int samplerCount = scene.samplerCount();
-					int sample_index = (int)random->uniform(0.0, samplerCount);
-					sample_index = std::min(sample_index, samplerCount - 1);
-					double sampler_select_p = 1.0 / samplerCount;
-
 					for (auto it = scene.sampler_begin(); it != scene.sampler_end(); ++it) {
-						if (std::distance(scene.sampler_begin(), it) != sample_index) {
-							continue;
-						}
-
 						glm::dvec3 q;
 						glm::dvec3 n;
 						glm::dvec3 Le;
@@ -311,12 +339,19 @@ namespace rt {
 
 						double g = GTerm(p, cosThetaP, q, cosThetaQ);
 
-						glm::dvec3 contribution = T * bxdf * Le * g;
+						glm::dvec3 contribution = T * bxdf * Le * g / pdf_area;
 
-						/* 裏面は発光しない */
-						if (has_value(contribution, 1.0e-6)) {
+						if (has_value(contribution, kValueEPS)) {
 							if (scene.occluded(p + m->Ng * kSceneEPS, q + n * kSceneEPS) == false) {
-								Lo += contribution / (pdf_area * sampler_select_p);
+#if ENABLE_NEE_MIS
+								double this_pdf = pdf_area;
+								double other_pdf = m->pdf(wo, wi) * glm::dot(-n, wi) / glm::distance2(p, q);
+								// double mis_weight = this_pdf / (this_pdf + other_pdf);
+								double mis_weight = this_pdf * this_pdf / (this_pdf * this_pdf + other_pdf * other_pdf);
+								Lo += contribution * mis_weight;
+#else
+								Lo += contribution;
+#endif
 							}
 						}
 					}
@@ -328,14 +363,36 @@ namespace rt {
 				double pdf = m->pdf(wo, wi);
 				double cosTheta = std::abs(glm::dot(m->Ng, wi));
 
-#if ENABLE_NEE
+				glm::dvec3 contribution = emission * T;
+#if ENABLE_NEE_MIS
+				if (has_value(contribution, kValueEPS)) {
+					bool mis = false;
+					if (i != 0) {
+						if (auto sampler = m->direct_sampler()) {
+							if (sampler->can_sample(previous_m->p)) {
+								double r = (double)tmin;
+								double this_pdf = previous_pdf * glm::dot(m->Ng, wo) / (r * r);
+								double other_pdf = sampler->pdf_area(previous_m->p, m->p);
+								// double mis_weight = this_pdf * this_pdf / (this_pdf + other_pdf);
+								double mis_weight = this_pdf * this_pdf / (this_pdf * this_pdf + other_pdf * other_pdf);
+								mis = true;
+								Lo += contribution * mis_weight;
+							}
+						}
+					}
+
+					if (mis == false) {
+						Lo += contribution;
+					}
+				}
+#elif ENABLE_NEE
 				if (i == 0) {
-					Lo += emission * T;
+					Lo += contribution;
 				}
 #else
-				Lo += emission * T;
+				Lo += contribution;
 #endif
-				if (has_value(bxdf, 1.0e-6)) {
+				if (has_value(bxdf, kValueEPS)) {
 					T *= bxdf * cosTheta / pdf;
 				}
 				else {
@@ -347,10 +404,13 @@ namespace rt {
 
 				ro = (ro + rd * (double)tmin) + m->Ng * kSceneEPS;
 				rd = wi;
+
+				previous_pdf = pdf;
 			}
 			else {
 				break;
 			}
+			previous_m = m;
 		}
 		return Lo;
 	}

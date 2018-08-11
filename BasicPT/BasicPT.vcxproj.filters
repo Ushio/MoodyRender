@@ -23,6 +23,9 @@
     <ClInclude Include="..\common\MicrosurfaceScattering.h">
       <Filter>src</Filter>
     </ClInclude>
+    <ClInclude Include="..\common\direct_sampler.hpp">
+      <Filter>src</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="icon.rc" />

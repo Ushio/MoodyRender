@@ -71,6 +71,7 @@ namespace rt {
 		// 幾何学法線
 		glm::dvec3 Ng;
 		bool backfacing = false;
+		glm::dvec3 p;
 
 		// evaluate emission
 		virtual glm::dvec3 emission(const glm::dvec3 &wo) const {

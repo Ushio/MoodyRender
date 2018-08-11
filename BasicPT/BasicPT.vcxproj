@@ -198,6 +198,7 @@
     <ClCompile Include="src\ofApp.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\common\direct_sampler.hpp" />
     <ClInclude Include="..\common\MicrosurfaceScattering.h" />
     <ClInclude Include="src\ofApp.h" />
   </ItemGroup>
