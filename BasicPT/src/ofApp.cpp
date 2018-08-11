@@ -614,6 +614,10 @@ namespace rt {
 		return cosThetaP * cosThetaQ / glm::distance2(p, q);
 	}
 
+	inline bool has_value(const glm::dvec3 &c, double eps) {
+		return glm::any(glm::greaterThanEqual(c, glm::dvec3(eps)));
+	}
+
 #define ENABLE_NEE 1
 	inline glm::dvec3 radiance(const rt::SceneInterface &scene, glm::dvec3 ro, glm::dvec3 rd, PeseudoRandom *random) {
 		const double kSceneEPS = scene.adaptiveEps();
@@ -653,7 +657,7 @@ namespace rt {
 						(*it)->sample(random, p, &q, &n, &Le, &pdf_area);
 
 						// 簡単なテスト
-						if (std::abs(pdf_area - (*it)->pdf_area(p, q)) > 1.0e-6) { abort(); }
+						// if (std::abs(pdf_area - (*it)->pdf_area(p, q)) > 1.0e-6) { abort(); }
 
 						glm::dvec3 wi = glm::normalize(q - p);
 						glm::dvec3 bxdf = m->bxdf(wo, wi);
@@ -665,7 +669,7 @@ namespace rt {
 						glm::dvec3 contribution = T * bxdf * Le * g;
 
 						/* 裏面は発光しない */
-						if (glm::any(glm::greaterThanEqual(contribution, glm::dvec3(glm::epsilon<double>())))) {
+						if (has_value(contribution, 1.0e-6)) {
 							if (scene.occluded(p + m->Ng * kSceneEPS, q + n * kSceneEPS) == false) {
 								Lo += contribution / (pdf_area * sampler_select_p);
 							}
@@ -679,7 +683,6 @@ namespace rt {
 				double pdf = m->pdf(wo, wi);
 				double cosTheta = std::abs(glm::dot(m->Ng, wi));
 
-
 #if ENABLE_NEE
 				if (i == 0) {
 					Lo += emission * T;
@@ -687,10 +690,13 @@ namespace rt {
 #else
 				Lo += emission * T;
 #endif
-				if (glm::any(glm::greaterThanEqual(bxdf, glm::dvec3(1.0e-6f)))) {
+				if (has_value(bxdf, 1.0e-6)) {
 					T *= bxdf * cosTheta / pdf;
 				}
 				else {
+					break;
+				}
+				if (has_value(T, 1.0e-6) == false) {
 					break;
 				}
 
