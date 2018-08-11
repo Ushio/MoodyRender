@@ -158,6 +158,16 @@ namespace rt {
 				-_x0
 			);
 
+			/*
+			a.y * b.z - b.y * a.z,
+			a.z * b.x - b.z * a.x,
+			a.x * b.y - b.x * a.y
+
+			a.y * b.z - 0.0 * a.z,
+			a.z * b.x - b.z * 0.0,
+			0.0 * 0.0 - b.x * a.y
+			*/
+
 			// 必要なのは、zだけであるので、正規化はzだけ
 			_y0y0 = _y0 * _y0;
 			_n[0].z /= std::sqrt(_z0z0 + _y0y0);
@@ -182,6 +192,11 @@ namespace rt {
 
 		double solidAngle() const {
 			return _sr;
+		}
+		static bool can_sample(const Rectangle &rectangle, const glm::dvec3 &o) {
+			glm::dvec3 d = rectangle.s() - o;
+			double z0 = glm::dot(d, rectangle.z());
+			return 1.0e-6 < std::abs(z0);
 		}
 		glm::dvec3 sample(double u, double v) const {
 			double AQ = _sr;
@@ -235,7 +250,11 @@ namespace rt {
 	*/
 	class IDirectSampler {
 	public:
+		// サンプリングが可能かどうか can_sample == falseなら pdf = 0である
+		virtual bool can_sample(glm::dvec3 o) const = 0;
 		virtual double pdf_area(glm::dvec3 o, glm::dvec3 p) const = 0;
+
+		// can_sample == false のときは呼ばないことにする
 		virtual void sample(PeseudoRandom *random, glm::dvec3 o, glm::dvec3 *p, glm::dvec3 *n, glm::dvec3 *Le, double *pdf_area) const = 0;
 	};
 
@@ -251,19 +270,32 @@ namespace rt {
 			_one_over_area = 1.0 / triangleArea(_a, _b, _c);
 		}
 
-		virtual double pdf_area(glm::dvec3 o, glm::dvec3 p) const {
-			// 裏面はサンプリングされないため、確率密度は0
-			if (_doubleSided == false) {
-				glm::dvec3 d = p - o;
-				bool backfacing = 0.0 < glm::dot(d, _n);
-				if (backfacing) {
-					return 0.0;
-				}
+		virtual double pdf_area(glm::dvec3 o, glm::dvec3 p) const override {
+			if (can_sample(o) == false) {
+				return 0.0;
 			}
 			return _one_over_area;
 		}
+		virtual bool can_sample(glm::dvec3 o) const override {
+			// サンプル面からの符号付き距離
+			// sd > 0.0 なら表
+			double sd = glm::dot(o - _a, _n);
+			const double kEps = 1.0e-6;
+
+			if (_doubleSided) {
+				// 面に対して水平でない : |sd| > kEps
+				return std::abs(sd) > kEps;
+			}
+			else {
+				// 面に対して水平でない : |sd| > kEps
+				// 表                   : sd > 0
+				// したがって、
+				// sd > kEps
+				return sd > kEps;
+			}
+		}
 		
-		virtual void sample(PeseudoRandom *random, glm::dvec3 o, glm::dvec3 *p, glm::dvec3 *n, glm::dvec3 *Le, double *pdf_area) const {
+		virtual void sample(PeseudoRandom *random, glm::dvec3 o, glm::dvec3 *p, glm::dvec3 *n, glm::dvec3 *Le, double *pdf_area) const override {
 			*p = uniform_on_triangle(random->uniform(), random->uniform()).evaluate(_a, _b, _c);
 
 			glm::dvec3 d = *p - o;
@@ -272,15 +304,12 @@ namespace rt {
 			if (_doubleSided) {
 				*n = backfacing ? -_n : _n;
 				*Le = _Le;
-				*pdf_area = _one_over_area;
 			}
 			else {
 				*n = _n;
 				*Le = backfacing ? glm::dvec3(0.0) : _Le;
-
-				// 裏面はサンプリングされないため、確率密度は0
-				*pdf_area = backfacing ? 0.0 : _one_over_area;
 			}
+			*pdf_area = _one_over_area;
 		}
 	private:
 		glm::dvec3 _Le;
@@ -298,7 +327,24 @@ namespace rt {
 		{
 
 		}
+		virtual bool can_sample(glm::dvec3 o) const override {
+			// サンプル面からの符号付き距離
+			// sd > 0.0 なら表
+			double sd = glm::dot(o - _q.s(), _q.normal());
+			const double kEps = 1.0e-6;
 
+			if (_doubleSided) {
+				// 面に対して水平でない : |sd| > kEps
+				return std::abs(sd) > kEps;
+			}
+			else {
+				// 面に対して水平でない : |sd| > kEps
+				// 表                   : sd > 0
+				// したがって、
+				// sd > kEps
+				return sd > kEps;
+			}
+		}
 		virtual void sample(PeseudoRandom *random, glm::dvec3 o, glm::dvec3 *p, glm::dvec3 *n, glm::dvec3 *Le, double *pdf_area) const
 		{
 			SphericalRectangleSamplerCoordinate sampler(_q, o);
@@ -315,28 +361,21 @@ namespace rt {
 				*Le = backfacing ? glm::dvec3(0.0) : _Le;
 			}
 
-			if (_doubleSided == false && backfacing) {
-				*pdf_area = 0.0;
-			} else {
-				double dLength2 = glm::length2(d);
-				double cosTheta = glm::dot(-*n, d / std::sqrt(dLength2));
-				double pw = 1.0 / sampler.solidAngle();
-				*pdf_area = pw * cosTheta / dLength2;
-			}
+			double dLength2 = glm::length2(d);
+			double cosTheta = glm::dot(-*n, d / std::sqrt(dLength2));
+			double pw = 1.0 / sampler.solidAngle();
+			*pdf_area = pw * cosTheta / dLength2;
 		}
 		virtual double pdf_area(glm::dvec3 o, glm::dvec3 p) const {
+			if (can_sample(o) == false) {
+				return 0.0;
+			}
+
 			glm::dvec3 d = p - o;
 			bool backfacing = 0.0 < glm::dot(d, _q.normal());
-
-			// 裏面はサンプリングされないため、確率密度は0
-			if (_doubleSided == false) {
-				if (backfacing) {
-					return 0.0;
-				}
-			}
-			SphericalRectangleSamplerCoordinate sampler(_q, o);
-
 			glm::dvec3 n = backfacing ? -_q.normal() : _q.normal();
+
+			SphericalRectangleSamplerCoordinate sampler(_q, o);
 			double dLength2 = glm::length2(d);
 			double cosTheta = glm::dot(-n, d / std::sqrt(dLength2));
 			double pw = 1.0 / sampler.solidAngle();
@@ -607,14 +646,18 @@ namespace rt {
 						glm::dvec3 n;
 						glm::dvec3 Le;
 						double pdf_area = 0.0;
+						if ((*it)->can_sample(p) == false) {
+							continue;
+						}
+
 						(*it)->sample(random, p, &q, &n, &Le, &pdf_area);
 
 						// 簡単なテスト
-						// if (std::abs(pdf_area - (*it)->pdf_area(p, q)) > 1.0e-6) { abort(); }
+						if (std::abs(pdf_area - (*it)->pdf_area(p, q)) > 1.0e-6) { abort(); }
 
 						glm::dvec3 wi = glm::normalize(q - p);
 						glm::dvec3 bxdf = m->bxdf(wo, wi);
-						double cosThetaP = glm::abs(glm::dot(m->Ng, wi));
+						double cosThetaP = glm::dot(m->Ng, wi);
 						double cosThetaQ = glm::dot(n, -wi);
 
 						double g = GTerm(p, cosThetaP, q, cosThetaQ);
@@ -622,7 +665,6 @@ namespace rt {
 						glm::dvec3 contribution = T * bxdf * Le * g;
 
 						/* 裏面は発光しない */
-						// 0.0 < cosThetaQ && 
 						if (glm::any(glm::greaterThanEqual(contribution, glm::dvec3(glm::epsilon<double>())))) {
 							if (scene.occluded(p + m->Ng * kSceneEPS, q + n * kSceneEPS) == false) {
 								Lo += contribution / (pdf_area * sampler_select_p);
