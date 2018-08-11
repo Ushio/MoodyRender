@@ -9,6 +9,7 @@
 #include "coordinate.hpp"
 #include "MicrosurfaceScattering.h"
 #include "stack_based_polymophic_value.hpp"
+#include "direct_sampler.hpp"
 
 namespace rt {
 	class UniformHemisphereSampler {
