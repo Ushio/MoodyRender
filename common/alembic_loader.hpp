@@ -414,6 +414,7 @@ namespace rt {
 		// Primitive Material
 		const char *LambertianMaterialString = "LambertianMaterial";
 		const char *SpecularMaterialString = "SpecularMaterial";
+		const char *DielectricsMaterialString = "DielectricsMaterial";
 		const char *MicrofacetConductorMaterialString = "MicrofacetConductorMaterial";
 		const char *MicrofacetCoupledConductorMaterialString = "MicrofacetCoupledConductorMaterial";
 		const char *MicrofacetCoupledDielectricsMaterialString = "MicrofacetCoupledDielectricsMaterial";
@@ -490,6 +491,9 @@ namespace rt {
 			}
 			else if (materialString == SpecularMaterialString) {
 				geom.primitives[primID].material = SpecularMaterial();
+			}
+			else if (materialString == DielectricsMaterialString) {
+				geom.primitives[primID].material = DielectricsMaterial();
 			}
 			else if (materialString == HeitzConductorMaterialString) {
 				double alpha = 0.5f;

@@ -76,6 +76,10 @@ namespace rt {
 		bool backfacing = false;
 		glm::dvec3 p;
 
+		glm::dvec3 NgExact() const {
+			return backfacing ? -Ng : Ng;
+		}
+
 		// evaluate emission
 		virtual glm::dvec3 emission(const glm::dvec3 &wo) const {
 			return glm::dvec3(0.0);
@@ -130,8 +134,7 @@ namespace rt {
 			return sampler;
 		}
 		glm::dvec3 emission(const glm::dvec3 &wo) const override {
-			glm::dvec3 n_orig = backfacing ? -Ng : Ng;
-			if (backEmission == false && glm::dot(n_orig, wo) < 0.0) {
+			if (backEmission == false && glm::dot(NgExact(), wo) < 0.0) {
 				return glm::dvec3(0.0);
 			}
 			return Le;
@@ -162,8 +165,46 @@ namespace rt {
 			return glm::reflect(-wo, Ng);
 		}
 		double pdf(const glm::dvec3 &wo, const glm::dvec3 &sampled_wi) const override {
-			glm::dvec3 wi = glm::reflect(-wo, Ng);
-			return glm::distance2(wi, sampled_wi) < 1.0e-6 ? glm::dot(Ng, wi) : 0.0;
+			return glm::dot(Ng, sampled_wi);
+		}
+	};
+
+	// etaは相対屈折率
+	inline glm::dvec3 refract_with_total_reflection(const glm::dvec3 &I, const glm::dvec3 &N, double eta) {
+		double NoI = glm::dot(N, I);
+		double k = 1.0 - eta * eta * (1.0 - NoI * NoI);
+		if (k <= 0.0) {
+			return I - 2.0 * N * NoI;
+		}
+		return eta * I - (eta * NoI + glm::sqrt(k)) * N;
+	}
+
+	class DielectricsMaterial : public IMaterial {
+	public:
+		double eta_dielectrics = 1.5;
+		bool can_direct_sampling() const override {
+			return false;
+		}
+		glm::dvec3 bxdf(const glm::dvec3 &wo, const glm::dvec3 &wi) const override {
+			return glm::dvec3(1.0);
+		}
+		glm::dvec3 sample(PeseudoRandom *random, const glm::dvec3 &wo) const override {
+			double eta_t = eta_dielectrics;
+			double eta_i = 1.0;
+			if (backfacing) {
+				std::swap(eta_i, eta_t);
+			}
+			double eta = eta_i / eta_t;
+			double f = fresnel_dielectrics(glm::dot(Ng, wo), eta_t, eta_i);
+			if (random->uniform() < f) {
+				return glm::reflect(-wo, Ng);
+			}
+			glm::dvec3 wi = refract_with_total_reflection(-wo, Ng, eta);
+			double cosTheta = glm::dot(wi, Ng);
+			return wi;
+		}
+		double pdf(const glm::dvec3 &wo, const glm::dvec3 &sampled_wi) const override {
+			return glm::abs(glm::dot(Ng, sampled_wi));
 		}
 	};
 
@@ -358,7 +399,7 @@ namespace rt {
 
 			{
 				double cosThetaFresnel = glm::dot(h, wo);
-				glm::dvec3 f = glm::dvec3(fresnel_dielectrics(cosThetaFresnel));
+				glm::dvec3 f = glm::dvec3(fresnel_dielectrics(cosThetaFresnel, 1.5, 1.0));
 				brdf_spec = f * brdf_without_f;
 			}
 
@@ -539,6 +580,7 @@ namespace rt {
 	typedef StackBasedPolymophicValue<IMaterial,
 		LambertianMaterial,
 		SpecularMaterial,
+		DielectricsMaterial,
 		MicrofacetConductorMaterial,
 		MicrofacetCoupledConductorMaterial,
 		MicrofacetCoupledDielectricsMaterial,

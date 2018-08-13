@@ -298,7 +298,8 @@ namespace rt {
 #define ENABLE_NEE 1
 #define ENABLE_NEE_MIS 1
 	inline glm::dvec3 radiance(const rt::SceneInterface &scene, glm::dvec3 ro, glm::dvec3 rd, PeseudoRandom *random) {
-		const double kSceneEPS = scene.adaptiveEps();
+		// const double kSceneEPS = scene.adaptiveEps();
+		const double kSceneEPS = 1.0e-6;
 		const double kValueEPS = 1.0e-6;
 
 		glm::dvec3 Lo;
@@ -306,7 +307,7 @@ namespace rt {
 		Material previous_m;
 		double previous_pdf = 0.0;
 
-		constexpr int kDepth = 10;
+		constexpr int kDepth = 30;
 		for (int i = 0; i < kDepth; ++i) {
 			Material m;
 			float tmin = 0.0f;
@@ -364,7 +365,8 @@ namespace rt {
 				glm::dvec3 bxdf = m->bxdf(wo, wi);
 				glm::dvec3 emission = m->emission(wo);
 				double pdf = m->pdf(wo, wi);
-				double cosTheta = std::abs(glm::dot(m->Ng, wi));
+				double NoI = glm::dot(m->Ng, wi);
+				double cosTheta = std::abs(NoI);
 
 				glm::dvec3 contribution = emission * T;
 #if ENABLE_NEE_MIS
@@ -405,7 +407,8 @@ namespace rt {
 					break;
 				}
 
-				ro = (ro + rd * (double)tmin) + m->Ng * kSceneEPS;
+				// バイアスする方向は潜り込むときは逆転する
+				ro = (ro + rd * (double)tmin) + (0.0 < NoI ? m->Ng : -m->Ng) * kSceneEPS;
 				rd = wi;
 
 				previous_pdf = pdf;

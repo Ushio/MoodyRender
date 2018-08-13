@@ -228,12 +228,10 @@ namespace rt {
 		return (fresnel_v(n, k, cosTheta) + fresnel_h(n, k, cosTheta)) * 0.5;
 	}
 
-	// Air to Glass
-	inline double fresnel_dielectrics(double cosTheta) {
+	// 1.5: grass
+	inline double fresnel_dielectrics(double cosTheta, double eta_t, double eta_i) {
 		auto sqr = [](double x) { return x * x; };
 
-		double eta_t = 1.5; // for Glass
-		double eta_i = 1.0;
 		double c = cosTheta;
 		double g = std::sqrt(eta_t * eta_t / sqr(eta_i) - 1.0 + sqr(c));
 
