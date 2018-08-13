@@ -326,6 +326,9 @@ namespace rt {
 						if ((*it)->can_sample(p) == false) {
 							continue;
 						}
+						if (m->can_direct_sampling() == false) {
+							continue;
+						}
 
 						(*it)->sample(random, p, &q, &n, &Le, &pdf_area);
 
@@ -369,7 +372,7 @@ namespace rt {
 					bool mis = false;
 					if (i != 0) {
 						if (auto sampler = m->direct_sampler()) {
-							if (sampler->can_sample(previous_m->p)) {
+							if (sampler->can_sample(previous_m->p) && previous_m->can_direct_sampling()) {
 								double r = (double)tmin;
 								double this_pdf = previous_pdf * glm::dot(m->Ng, wo) / (r * r);
 								double other_pdf = sampler->pdf_area(previous_m->p, m->p);

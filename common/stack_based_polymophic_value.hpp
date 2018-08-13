@@ -91,7 +91,7 @@ namespace rt {
 
 		template <class T>
 		StackBasedPolymophicValue(const T &value) {
-			static_assert(sbpv_details::is_one_of<T, Ts...>::value, "T is must be any of Ts...");
+			static_assert(sbpv_details::is_one_of<T, Ts...>::value, "constructor(T) is must be any of Ts...");
 			_manager = sbpv_details::InstanceManagerT<TBase, T>::instance();
 			_manager->copyConstruct(p(), &value);
 		}
@@ -110,7 +110,7 @@ namespace rt {
 
 		template <class T>
 		Self &operator=(const T &value) {
-			static_assert(sbpv_details::is_one_of<T, Ts...>::value, "T is must be any of Ts...");
+			static_assert(sbpv_details::is_one_of<T, Ts...>::value, "operator= T is must be any of Ts...");
 
 			if (_manager) {
 				_manager->destruct(p());

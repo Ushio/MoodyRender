@@ -4,6 +4,7 @@
 #include <glm/ext.hpp>
 
 #include <functional>
+#include <strict_variant/variant.hpp>
 #include "peseudo_random.hpp"
 #include "microfacet.hpp"
 #include "coordinate.hpp"
@@ -12,6 +13,8 @@
 #include "direct_sampler.hpp"
 
 namespace rt {
+	static const double kDirectSamplingAlphaThreashold = 0.2;
+
 	class UniformHemisphereSampler {
 	public:
 		// http://mathworld.wolfram.com/SpherePointPicking.html
@@ -81,6 +84,10 @@ namespace rt {
 			return nullptr;
 		}
 
+		virtual bool can_direct_sampling() const {
+			return true;
+		}
+
 		// evaluate bxdf
 		virtual glm::dvec3 bxdf(const glm::dvec3 &wo, const glm::dvec3 &wi) const = 0;
 
@@ -145,21 +152,29 @@ namespace rt {
 
 	class SpecularMaterial : public IMaterial {
 	public:
+		bool can_direct_sampling() const override {
+			return false;
+		}
 		glm::dvec3 bxdf(const glm::dvec3 &wo, const glm::dvec3 &wi) const override {
-			return glm::dvec3(1.0) * glm::one_over_pi<double>();
+			return glm::dvec3(1.0);
 		}
 		glm::dvec3 sample(PeseudoRandom *random, const glm::dvec3 &wo) const override {
-			return glm::dvec3();
+			return glm::reflect(-wo, Ng);
 		}
 		double pdf(const glm::dvec3 &wo, const glm::dvec3 &sampled_wi) const override {
-			return 0.0;
+			glm::dvec3 wi = glm::reflect(-wo, Ng);
+			return glm::distance2(wi, sampled_wi) < 1.0e-6 ? glm::dot(Ng, wi) : 0.0;
 		}
 	};
 
 	class MicrofacetConductorMaterial : public IMaterial {
 	public:
 		bool useFresnel = true;
-		double alpha = 0.2;
+		double alpha = 0.3;
+
+		bool can_direct_sampling() const override {
+			return kDirectSamplingAlphaThreashold <= alpha;
+		}
 
 		glm::dvec3 bxdf(const glm::dvec3 &wo, const glm::dvec3 &wi) const override {
 			double cos_term_wo = glm::dot(Ng, wo);
@@ -211,7 +226,11 @@ namespace rt {
 	class MicrofacetCoupledConductorMaterial : public IMaterial {
 	public:
 		bool useFresnel = true;
-		double alpha = 0.5;
+		double alpha = 0.3;
+
+		bool can_direct_sampling() const override {
+			return kDirectSamplingAlphaThreashold <= alpha;
+		}
 
 		glm::dvec3 bxdf(const glm::dvec3 &wo, const glm::dvec3 &wi) const override {
 			double cos_term_wo = glm::dot(Ng, wo);
@@ -502,15 +521,28 @@ namespace rt {
 			return UniformHemisphereSampler::pdf(sampled_wi, Ng);
 		}
 	};
-
+	//class UndefinedMaterial : public IMaterial {
+	//public:
+	//	bool can_direct_sampling() const override {
+	//		return false;
+	//	}
+	//	glm::dvec3 bxdf(const glm::dvec3 &wo, const glm::dvec3 &wi) const override {
+	//		return glm::dvec3(1.0);
+	//	}
+	//	glm::dvec3 sample(PeseudoRandom *random, const glm::dvec3 &wo) const override {
+	//		return glm::dvec3();
+	//	}
+	//	double pdf(const glm::dvec3 &wo, const glm::dvec3 &sampled_wi) const override {
+	//		return 0.0;
+	//	}
+	//};
 	typedef StackBasedPolymophicValue<IMaterial,
 		LambertianMaterial,
 		SpecularMaterial,
 		MicrofacetConductorMaterial,
 		MicrofacetCoupledConductorMaterial,
 		MicrofacetCoupledDielectricsMaterial,
-		HeitzConductorMaterial,
-		MicrofacetVelvetMaterial
+		HeitzConductorMaterial
 	> Material;
 
 }
