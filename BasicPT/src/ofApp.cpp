@@ -330,9 +330,6 @@ namespace rt {
 						glm::dvec3 Le;
 						double pdf_area = 0.0;
 
-						if (i == 0 && (*it)->can_sample(p)) {
-							printf("");
-						}
 						if ((*it)->can_sample(p) == false) {
 							continue;
 						}
@@ -340,7 +337,6 @@ namespace rt {
 						if (m->can_direct_sampling() == false) {
 							continue;
 						}
-
 
 						(*it)->sample(random, p, &q, &n, &Le, &pdf_area);
 
@@ -509,7 +505,7 @@ namespace rt {
 						if (glm::isfinite(r[i]) == false) {
 							r[i] = 0.0;
 						}
-						if (r[i] < 0.0 || 1000.0 < r[i]) {
+						if (r[i] < 0.0 || 10000.0 < r[i]) {
 							r[i] = 0.0;
 						}
 					}
@@ -533,7 +529,7 @@ namespace rt {
 								r[i] = 0.0;
 								badSample = true;
 							}
-							if (r[i] < 0.0 || 1000.0 < r[i]) {
+							if (r[i] < 0.0 || 10000.0 < r[i]) {
 								r[i] = 0.0;
 								badSample = true;
 							}
@@ -642,7 +638,7 @@ void ofApp::setup() {
 		ofToDataPath("baked/albedo_specular_dielectrics_avg.bin").c_str());
 }
 void ofApp::exit() {
-	ofxImGuiLite::shutdown();
+	// ofxImGuiLite::shutdown();
 }
 //--------------------------------------------------------------
 void ofApp::update() {
@@ -736,7 +732,7 @@ void ofApp::draw() {
 		}
 		uint32_t n = renderer->stepCount();
 
-		if (128 <= n && isPowerOfTwo(n)) {
+		if (64 <= n && isPowerOfTwo(n)) {
 			_image.setFromPixels(toOf(renderer->_image));
 			char name[64];
 			sprintf(name, "%dspp.png", n);
