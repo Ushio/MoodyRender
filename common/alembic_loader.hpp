@@ -493,7 +493,9 @@ namespace rt {
 				geom.primitives[primID].material = SpecularMaterial();
 			}
 			else if (materialString == DielectricsMaterialString) {
-				geom.primitives[primID].material = DielectricsMaterial();
+				DielectricsMaterial m;
+				abcGeom.getAttribute("eta", primID, &m.eta_dielectrics);
+				geom.primitives[primID].material = m;
 			}
 			else if (materialString == HeitzConductorMaterialString) {
 				double alpha = 0.5f;

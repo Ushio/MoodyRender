@@ -13,6 +13,10 @@
 #include "direct_sampler.hpp"
 
 namespace rt {
+	// R: 650nm
+	// G: 550nm
+	// B: 450nm
+
 	static const double kDirectSamplingAlphaThreashold = 0.2;
 
 	class UniformHemisphereSampler {
@@ -182,12 +186,15 @@ namespace rt {
 	class DielectricsMaterial : public IMaterial {
 	public:
 		double eta_dielectrics = 1.5;
+
 		bool can_direct_sampling() const override {
 			return false;
 		}
 		glm::dvec3 bxdf(const glm::dvec3 &wo, const glm::dvec3 &wi) const override {
+			// 必ず入ったら出ることにして、放射輝度のスケーリングを無視する
 			return glm::dvec3(1.0);
 		}
+
 		glm::dvec3 sample(PeseudoRandom *random, const glm::dvec3 &wo) const override {
 			double eta_t = eta_dielectrics;
 			double eta_i = 1.0;
