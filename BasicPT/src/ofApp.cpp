@@ -15,6 +15,7 @@
 #include <embree3/rtcore.h>
 
 #include "ofApp.h"
+#include "ofxImGuiLite.hpp"
 
 #define DEBUG_MODE 0
 
@@ -464,7 +465,7 @@ namespace rt {
 			: _scene(scene)
 			, _sceneInterface(new rt::SceneInterface(scene))
 			, _image(scene->camera.imageWidth(), scene->camera.imageHeight()) {
-
+			_badSampleCount = 0;
 		}
 		void step() {
 			_steps++;
@@ -510,15 +511,21 @@ namespace rt {
 
 						auto r = radiance(*_sceneInterface, o, d, random);
 
+						bool badSample = false;
 						for (int i = 0; i < r.length(); ++i) {
 							if (glm::isfinite(r[i]) == false) {
 								r[i] = 0.0;
+								badSample = true;
 							}
 							if (r[i] < 0.0 || 1000.0 < r[i]) {
 								r[i] = 0.0;
+								badSample = true;
 							}
 						}
 						_image.add(x, y, r);
+						if (badSample) {
+							_badSampleCount++;
+						}
 					}
 				}
 			});
@@ -532,10 +539,14 @@ namespace rt {
 			return *_sceneInterface;
 		}
 
+		int badSampleCount() const {
+			return _badSampleCount.load();
+		}
 		std::shared_ptr<rt::Scene> _scene;
 		std::shared_ptr<rt::SceneInterface> _sceneInterface;
 		Image _image;
 		int _steps = 0;
+		std::atomic<int> _badSampleCount;
 	};
 }
 
@@ -589,6 +600,8 @@ void ofApp::setup() {
 	_MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
 	_MM_SET_DENORMALS_ZERO_MODE(_MM_DENORMALS_ZERO_ON);
 
+	ofxImGuiLite::initialize();
+
 	ofSetVerticalSync(false);
 
 	_camera.setNearClip(0.1);
@@ -612,7 +625,9 @@ void ofApp::setup() {
 		ofToDataPath("baked/albedo_specular_dielectrics.bin").c_str(),
 		ofToDataPath("baked/albedo_specular_dielectrics_avg.bin").c_str());
 }
-
+void ofApp::exit() {
+	ofxImGuiLite::shutdown();
+}
 //--------------------------------------------------------------
 void ofApp::update() {
 
@@ -636,7 +651,7 @@ void ofApp::draw() {
 
 	ofSetColor(255);
 
-	if (0) {
+	if (_showWireframe) {
 		for (int i = 0; i < scene->geometries.size(); ++i) {
 			static ofMesh mesh;
 			mesh.clear();
@@ -695,8 +710,10 @@ void ofApp::draw() {
 		}
 	}
 
-	{
+	if(_render) {
 		renderer->step();
+
+		ofDisableArbTex();
 
 		if (ofGetFrameNum() % 5 == 0) {
 			_image.setFromPixels(toOf(renderer->_image));
@@ -710,42 +727,40 @@ void ofApp::draw() {
 			_image.save(name);
 			printf("elapsed %fs\n", ofGetElapsedTimef());
 		}
+
+		ofEnableArbTex();
 	}
-
-	//{
-	//	static rt::Xor64 random;
-
-
-	//	ofMesh mesh;
-	//	mesh.setMode(OF_PRIMITIVE_POINTS);
-
-	//	ofSetColor(255, 0, 0);
-
-	//	for (int i = 0; i < 3000; ++i) {
-	//		glm::dvec3 p;
-	//		rt::Material m;
-	//		renderer->sceneInterface().sampleEmissiveUniform(&random, &p, &m);
-	//		mesh.addVertex(p);
-
-	//		ofDrawLine(p, p + rt::bxdf_Ng(m) * 0.2);
-	//	}
-
-	//	mesh.draw();
-	//}
 
 	_camera.end();
 
 	ofDisableDepthTest();
 	ofSetColor(255);
 
+	ofxImGuiLite::ScopedImGui imgui;
 
-	if (_image.isAllocated() && _showImage) {
-		_image.draw(30, 30);
+	// camera control                                          for control clicked problem
+	if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow) || (ImGui::IsAnyWindowFocused() && ImGui::IsAnyMouseDown())) {
+		_camera.disableMouseInput();
+	}
+	else {
+		_camera.enableMouseInput();
 	}
 
-	char buffer[256];
-	sprintf(buffer, "%d sample, fps = %.3f", renderer->stepCount(), ofGetFrameRate());
-	ofDrawBitmapString(buffer, 10, 10);
+	ImGui::SetNextWindowPos(ImVec2(20, 20), ImGuiSetCond_Appearing);
+	ImGui::SetNextWindowSize(ImVec2(700, 600), ImGuiSetCond_Appearing);
+	ImGui::SetNextWindowCollapsed(false, ImGuiSetCond_Appearing);
+	ImGui::SetNextWindowBgAlpha(0.5f);
+
+	ImGui::Begin("settings", nullptr);
+	ImGui::Checkbox("render", &_render);
+	ImGui::Checkbox("show wireframe", &_showWireframe);
+	
+	ImGui::Text("%d sample, fps = %.3f", renderer->stepCount(), ofGetFrameRate());
+	ImGui::Text("%d bad sample", renderer->badSampleCount());
+	if (_image.isAllocated()) {
+		ofxImGuiLite::image(_image);
+	}
+	ImGui::End();
 }
 
 //--------------------------------------------------------------
@@ -762,14 +777,6 @@ void ofApp::keyPressed(int key) {
 		_camera.lookAt(ofVec3f(lookAt.x, lookAt.y, lookAt.z), ofVec3f(camera.up().x, camera.up().y, camera.up().z));
 	}
 
-	if (key == ' ') {
-		_showImage = !_showImage;
-	}
-
-	//if (key == 's') {
-	//	_image.save("pt.png");
-	//	ofFloatImage img(_image);
-	//}
 	if (key == 's') {
 		ofFloatImage image = toOfLinear(renderer->_image);
 		image.save("pt.exr");

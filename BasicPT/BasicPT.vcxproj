@@ -126,7 +126,6 @@
       <WarningLevel>Level3</WarningLevel>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <CompileAs>CompileAsCpp</CompileAs>
-      <ObjectFileName>$(IntDir)/%(RelativeDir)/</ObjectFileName>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
@@ -174,7 +173,6 @@
       <WarningLevel>Level3</WarningLevel>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <CompileAs>CompileAsCpp</CompileAs>
-      <ObjectFileName>$(IntDir)/%(RelativeDir)/</ObjectFileName>
     </ClCompile>
     <Link>
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
@@ -193,11 +191,26 @@
     </CustomBuildStep>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\addons\ofxImGuiLite\libs\imgui.cpp" />
+    <ClCompile Include="..\..\..\addons\ofxImGuiLite\libs\imgui_demo.cpp" />
+    <ClCompile Include="..\..\..\addons\ofxImGuiLite\libs\imgui_draw.cpp" />
+    <ClCompile Include="..\..\..\addons\ofxImGuiLite\libs\imgui_impl_glfw_gl2.cpp" />
+    <ClCompile Include="..\..\..\addons\ofxImGuiLite\libs\imgui_impl_glfw_gl3.cpp" />
+    <ClCompile Include="..\..\..\addons\ofxImGuiLite\src\ofxImGuiLite.cpp" />
     <ClCompile Include="..\common\MicrosurfaceScattering.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\ofApp.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\imconfig.h" />
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\imgui.h" />
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\imgui_impl_glfw_gl2.h" />
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\imgui_impl_glfw_gl3.h" />
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\imgui_internal.h" />
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\stb_rect_pack.h" />
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\stb_textedit.h" />
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\stb_truetype.h" />
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\src\ofxImGuiLite.hpp" />
     <ClInclude Include="..\common\direct_sampler.hpp" />
     <ClInclude Include="..\common\MicrosurfaceScattering.h" />
     <ClInclude Include="src\ofApp.h" />

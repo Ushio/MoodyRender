@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "ofMain.h"
 
@@ -7,6 +7,7 @@ public:
 	void setup();
 	void update();
 	void draw();
+	void exit();
 
 	void keyPressed(int key);
 	void keyReleased(int key);
@@ -22,5 +23,6 @@ public:
 
 	ofEasyCam _camera;
 	ofImage _image;
-	bool _showImage = true;
+	bool _render = true;
+	bool _showWireframe = false;
 };
