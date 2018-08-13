@@ -175,8 +175,7 @@ namespace rt {
 			const auto &prim = geom.primitives[rayhit.hit.primID];
 			*material = prim.material;
 
-			// TODO これは後で削る
-			glm::dvec3 Ng = glm::normalize(glm::dvec3(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z));
+			glm::dvec3 Ng = prim.Ng;
 
 			// 裏面
 			bool backfacing = false;
@@ -324,7 +323,7 @@ namespace rt {
 				// NEE
 				// 最後のNEEは、PTと経路長をあわせるために、やらない
 				if(i != (kDepth - 1)) {
-					glm::dvec3 p = ro + rd * (double)tmin;
+					glm::dvec3 p = m->p;
 					for (auto it = scene.sampler_begin(); it != scene.sampler_end(); ++it) {
 						glm::dvec3 q;
 						glm::dvec3 n;
@@ -423,7 +422,7 @@ namespace rt {
 				}
 
 				// バイアスする方向は潜り込むときは逆転する
-				ro = (ro + rd * (double)tmin) + (0.0 < NoI ? m->Ng : -m->Ng) * kSceneEPS;
+				ro = m->p + (0.0 < NoI ? m->Ng : -m->Ng) * kSceneEPS;
 				rd = wi;
 
 				previous_pdf = pdf;

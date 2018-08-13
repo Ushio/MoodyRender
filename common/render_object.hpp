@@ -18,6 +18,7 @@ namespace rt {
 		};
 		struct Primitive {
 			glm::ivec3 indices;
+			glm::dvec3 Ng;
 			Material material;
 		};
 		std::vector<Point> points;

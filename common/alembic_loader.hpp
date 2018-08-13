@@ -7,6 +7,7 @@
 #include <tbb/tbb.h>
 
 #include "render_object.hpp"
+#include "geometry.hpp"
 
 #include <functional>
 
@@ -407,6 +408,8 @@ namespace rt {
 		for (int primID = 0; primID < abcGeom.primitives.size(); ++primID) {
 			Geometry::Primitive prim;
 			prim.indices = abcGeom.primitives[primID];
+			prim.Ng = triangleNormal(geom.points[prim.indices[0]].P, geom.points[prim.indices[1]].P, geom.points[prim.indices[2]].P);
+			prim.Ng = glm::normalize(prim.Ng);
 			prim.material = LambertianMaterial();
 			geom.primitives.push_back(prim);
 		}

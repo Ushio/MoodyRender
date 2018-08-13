@@ -3,8 +3,6 @@
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
 
-#include "peseudo_random.hpp"
-
 namespace rt {
 	inline glm::dvec3 triangleNormal(const glm::dvec3 &v0, const glm::dvec3 &v1, const glm::dvec3 &v2, bool isback) {
 		glm::dvec3 e1 = v1 - v0;
@@ -36,18 +34,4 @@ namespace rt {
 		s.beta = glm::max(eps1, eps2);
 		return s;
 	}
-
-	//inline glm::dvec3 uniform_on_unit_sphere(PeseudoRandom *random) {
-	//	glm::dvec3 d;
-	//	double sq = 0.0;
-	//	do {
-	//		d.x = random->uniform(-1.0, 1.0);
-	//		d.y = random->uniform(-1.0, 1.0);
-	//		d.z = random->uniform(-1.0, 1.0);
-
-	//		sq = glm::length2(d);
-	//	} while (sq < 0.0001 || 1.0 < sq);
-	//	d /= glm::sqrt(sq);
-	//	return d;
-	//}
 }
