@@ -174,6 +174,7 @@ namespace rt {
 			const auto &prim = geom.primitives[rayhit.hit.primID];
 			*material = prim.material;
 
+			// TODO これは後で削る
 			glm::dvec3 Ng = glm::normalize(glm::dvec3(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z));
 
 			// 裏面
@@ -187,17 +188,19 @@ namespace rt {
 			(*material)->Ng = Ng;
 			(*material)->backfacing = backfacing;
 
-			double u = rayhit.hit.u;
-			double v = rayhit.hit.v;
 			/*
 			https://embree.github.io/api.html
 			t_uv = (1-u-v)*t0 + u*t1 + v*t2
 				 = t0 + u*(t1-t0) + v*(t2-t0)
 			*/
-			auto v0 = geom.points[prim.indices[0]].P;
-			auto v1 = geom.points[prim.indices[1]].P;
-			auto v2 = geom.points[prim.indices[2]].P;
-			(*material)->p = (1.0 - u - v) * v0 + u * v1 + v * v2;
+			//double u = rayhit.hit.u;
+			//double v = rayhit.hit.v;
+			//auto v0 = geom.points[prim.indices[0]].P;
+			//auto v1 = geom.points[prim.indices[1]].P;
+			//auto v2 = geom.points[prim.indices[2]].P;
+			//(*material)->p = (1.0 - u - v) * v0 + u * v1 + v * v2;
+
+			(*material)->p = ro + rd * double(*tmin);
 			return true;
 		}
 
