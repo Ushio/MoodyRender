@@ -311,6 +311,8 @@ namespace rt {
 		Material previous_m;
 		double previous_pdf = 0.0;
 
+		bool inside = false;
+
 		constexpr int kDepth = 30;
 		for (int i = 0; i < kDepth; ++i) {
 			Material m;
@@ -372,7 +374,16 @@ namespace rt {
 				double NoI = glm::dot(m->Ng, wi);
 				double cosTheta = std::abs(NoI);
 
+				if (inside) {
+					T *= m->beers_law(tmin);
+				}
+				bool over_boundary = NoI < 0.0;
+				if (over_boundary) {
+					inside = !inside;
+				}
+
 				glm::dvec3 contribution = emission * T;
+
 #if ENABLE_NEE_MIS
 				if (has_value(contribution, kValueEPS)) {
 					bool mis = false;

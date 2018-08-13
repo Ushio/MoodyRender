@@ -495,6 +495,7 @@ namespace rt {
 			else if (materialString == DielectricsMaterialString) {
 				DielectricsMaterial m;
 				abcGeom.getAttribute("eta", primID, &m.eta_dielectrics);
+				abcGeom.getAttribute("sigma", primID, &m.sigma);
 				geom.primitives[primID].material = m;
 			}
 			else if (materialString == HeitzConductorMaterialString) {

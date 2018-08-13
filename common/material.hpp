@@ -96,6 +96,10 @@ namespace rt {
 			return true;
 		}
 
+		virtual glm::dvec3 beers_law(double through_length) const {
+			return glm::dvec3(0.0);
+		}
+
 		// evaluate bxdf
 		virtual glm::dvec3 bxdf(const glm::dvec3 &wo, const glm::dvec3 &wi) const = 0;
 
@@ -185,6 +189,9 @@ namespace rt {
 
 	class DielectricsMaterial : public IMaterial {
 	public:
+		// glm::dvec3 sigma = glm::dvec3(3.0);
+		// glm::dvec3 sigma = glm::dvec3(0.03, 3.0, 3.0);
+		glm::dvec3 sigma = glm::dvec3(0.0);
 		double eta_dielectrics = 1.5;
 
 		bool can_direct_sampling() const override {
@@ -194,7 +201,9 @@ namespace rt {
 			// 必ず入ったら出ることにして、放射輝度のスケーリングを無視する
 			return glm::dvec3(1.0);
 		}
-
+		virtual glm::dvec3 beers_law(double through_length) const {
+			return glm::exp(-sigma * through_length);
+		}
 		glm::dvec3 sample(PeseudoRandom *random, const glm::dvec3 &wo) const override {
 			double eta_t = eta_dielectrics;
 			double eta_i = 1.0;
