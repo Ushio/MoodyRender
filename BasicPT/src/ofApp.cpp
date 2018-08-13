@@ -329,12 +329,18 @@ namespace rt {
 						glm::dvec3 n;
 						glm::dvec3 Le;
 						double pdf_area = 0.0;
+
+						if (i == 0 && (*it)->can_sample(p)) {
+							printf("");
+						}
 						if ((*it)->can_sample(p) == false) {
 							continue;
 						}
+
 						if (m->can_direct_sampling() == false) {
 							continue;
 						}
+
 
 						(*it)->sample(random, p, &q, &n, &Le, &pdf_area);
 

@@ -105,7 +105,7 @@ namespace rt {
 				return values;
 			}
 			else {
-				throw std::exception();
+				throw std::exception("invalid data type");
 			}
 		}
 		else {
@@ -159,7 +159,7 @@ namespace rt {
 					}
 				}
 				catch (std::exception &e) {
-					printf("exception, %s\n", e.what());
+					printf("%s can't read, %s\n", header.getName().c_str(), e.what());
 					continue;
 				}
 			}

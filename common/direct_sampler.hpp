@@ -12,7 +12,7 @@ namespace rt {
 			_exLength = glm::length(ex);
 			_eyLength = glm::length(ey);
 			_x = ex / _exLength;
-			_y = ey / _exLength;
+			_y = ey / _eyLength;
 			_z = glm::cross(_x, _y);
 		}
 		glm::dvec3 sample(double u, double v) const {

@@ -229,9 +229,9 @@ namespace rt {
 		bool useFresnel = true;
 		double alpha = 0.3;
 
-		bool can_direct_sampling() const override {
-			return kDirectSamplingAlphaThreashold <= alpha;
-		}
+		//bool can_direct_sampling() const override {
+		//	return kDirectSamplingAlphaThreashold <= alpha;
+		//}
 
 		glm::dvec3 bxdf(const glm::dvec3 &wo, const glm::dvec3 &wi) const override {
 			double cos_term_wo = glm::dot(Ng, wo);
@@ -285,9 +285,9 @@ namespace rt {
 		bool useFresnel = true;
 		double alpha = 0.3;
 
-		bool can_direct_sampling() const override {
-			return kDirectSamplingAlphaThreashold <= alpha;
-		}
+		//bool can_direct_sampling() const override {
+		//	return kDirectSamplingAlphaThreashold <= alpha;
+		//}
 
 		glm::dvec3 bxdf(const glm::dvec3 &wo, const glm::dvec3 &wi) const override {
 			double cos_term_wo = glm::dot(Ng, wo);
