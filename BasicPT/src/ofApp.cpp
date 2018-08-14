@@ -298,8 +298,8 @@ namespace rt {
 	//	return std::exp(-double(sum) / k);
 	//}
 
-#define ENABLE_NEE 0
-#define ENABLE_NEE_MIS 0
+#define ENABLE_NEE 1
+#define ENABLE_NEE_MIS 1
 	inline glm::dvec3 radiance(const rt::SceneInterface &scene, glm::dvec3 ro, glm::dvec3 rd, PeseudoRandom *random) {
 		const double kSceneEPS = scene.adaptiveEps();
 		// const double kSceneEPS = 1.0e-6;
@@ -477,7 +477,10 @@ namespace rt {
 			: _scene(scene)
 			, _sceneInterface(new rt::SceneInterface(scene))
 			, _image(scene->camera.imageWidth(), scene->camera.imageHeight()) {
-			_badSampleCount = 0;
+			_badSampleNanCount = 0;
+			_badSampleInfCount = 0;
+			_badSampleNegativeCount = 0;
+			_badSampleFireflyCount = 0;
 		}
 		void step() {
 			_steps++;
@@ -523,21 +526,24 @@ namespace rt {
 
 						auto r = radiance(*_sceneInterface, o, d, random);
 
-						bool badSample = false;
 						for (int i = 0; i < r.length(); ++i) {
-							if (glm::isfinite(r[i]) == false) {
+							if (glm::isnan(r[i])) {
+								_badSampleNanCount++;
 								r[i] = 0.0;
-								badSample = true;
+							} else if (glm::isfinite(r[i]) == false) {
+								_badSampleInfCount++;
+								r[i] = 0.0;
 							}
-							if (r[i] < 0.0 || 10000.0 < r[i]) {
+							else if (r[i] < 0.0) {
+								_badSampleNegativeCount++;
 								r[i] = 0.0;
-								badSample = true;
+							}
+							if (10000.0 < r[i]) {
+								_badSampleFireflyCount++;
+								r[i] = 0.0;
 							}
 						}
 						_image.add(x, y, r);
-						if (badSample) {
-							_badSampleCount++;
-						}
 					}
 				}
 			});
@@ -551,14 +557,27 @@ namespace rt {
 			return *_sceneInterface;
 		}
 
-		int badSampleCount() const {
-			return _badSampleCount.load();
+		int badSampleNanCount() const {
+			return _badSampleNanCount.load();
 		}
+		int badSampleInfCount() const {
+			return _badSampleInfCount.load();
+		}
+		int badSampleNegativeCount() const {
+			return _badSampleNegativeCount.load();
+		}
+		int badSampleFireflyCount() const {
+			return _badSampleFireflyCount.load();
+		}
+
 		std::shared_ptr<rt::Scene> _scene;
 		std::shared_ptr<rt::SceneInterface> _sceneInterface;
 		Image _image;
 		int _steps = 0;
-		std::atomic<int> _badSampleCount;
+		std::atomic<int> _badSampleNanCount;
+		std::atomic<int> _badSampleInfCount;
+		std::atomic<int> _badSampleNegativeCount;
+		std::atomic<int> _badSampleFireflyCount;
 	};
 }
 
@@ -636,6 +655,10 @@ void ofApp::setup() {
 	rt::CoupledBRDFDielectrics::load(
 		ofToDataPath("baked/albedo_specular_dielectrics.bin").c_str(),
 		ofToDataPath("baked/albedo_specular_dielectrics_avg.bin").c_str());
+
+	rt::CoupledBRDFVelvet::load(
+		ofToDataPath("baked/albedo_velvet.bin").c_str(),
+		ofToDataPath("baked/albedo_velvet_avg.bin").c_str());
 }
 void ofApp::exit() {
 	// ofxImGuiLite::shutdown();
@@ -768,7 +791,10 @@ void ofApp::draw() {
 	ImGui::Checkbox("show wireframe", &_showWireframe);
 	
 	ImGui::Text("%d sample, fps = %.3f", renderer->stepCount(), ofGetFrameRate());
-	ImGui::Text("%d bad sample", renderer->badSampleCount());
+	ImGui::Text("%d bad sample nan", renderer->badSampleNanCount());
+	ImGui::Text("%d bad sample inf", renderer->badSampleInfCount());
+	ImGui::Text("%d bad sample neg", renderer->badSampleNegativeCount());
+	ImGui::Text("%d bad sample firefly", renderer->badSampleFireflyCount());
 	if (_image.isAllocated()) {
 		ofxImGuiLite::image(_image);
 	}

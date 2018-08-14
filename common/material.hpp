@@ -517,7 +517,7 @@ namespace rt {
 		std::shared_ptr<MicrosurfaceConductor> _microsurfaceConductor[3];
 	};
 
-	class MicrofacetVelvetMaterial : public IMaterial {
+	class MicrofacetVelvetEnergyLossMaterial : public IMaterial {
 	public:
 		double alpha = 0.2;
 
@@ -532,8 +532,10 @@ namespace rt {
 
 			glm::dvec3 h = glm::normalize(wi + wo);
 			double d = velvet_D(Ng, h, alpha);
+			// double g = velvet_G2(cos_term_wo, cos_term_wi, alpha);
+			// double g = velvet_G2_dot(cos_term_wo, cos_term_wi, alpha);
+			// double g = velvet_G1(cos_term_wo, alpha) * velvet_G1(cos_term_wi, alpha);
 			double g = velvet_G2(cos_term_wo, cos_term_wi, alpha);
-
 			double brdf_without_f = d * g / (4.0 * cos_term_wo * cos_term_wi);
 
 			glm::dvec3 brdf = glm::dvec3(brdf_without_f);
@@ -556,6 +558,69 @@ namespace rt {
 			return UniformHemisphereSampler::pdf(sampled_wi, Ng);
 		}
 	};
+
+	class MicrofacetVelvetMaterial : public IMaterial {
+	public:
+		double alpha = 0.2;
+		glm::dvec3 Cd = glm::dvec3(1.0, 1.0, 1.0);
+
+		glm::dvec3 bxdf(const glm::dvec3 &wo, const glm::dvec3 &wi) const override {
+			double cos_term_wo = glm::dot(Ng, wo);
+			double cos_term_wi = glm::dot(Ng, wi);
+
+			// chi_plus(glm::dot(Ng, omega_i)) * chi_plus(glm::dot(Ng, omega_o))
+			if (cos_term_wo <= 0.0 || cos_term_wi <= 0.0) {
+				return glm::dvec3();
+			}
+
+			glm::dvec3 h = glm::normalize(wi + wo);
+			double d = velvet_D(Ng, h, alpha);
+			double g = velvet_G2(cos_term_wo, cos_term_wi, alpha);
+			double brdf_without_f = d * g / (4.0 * cos_term_wo * cos_term_wi);
+
+			glm::dvec3 brdf_spec = Cd * glm::dvec3(brdf_without_f);
+			glm::dvec3 E = glm::dvec3(CoupledBRDFVelvet::specularAvgAlbedo().sample(alpha));
+			glm::dvec3 F = Cd;
+			glm::dvec3 kLambda = E * F * F / ((glm::dvec3(1.0) - F * (glm::dvec3(1.0) - E)));
+
+			glm::dvec3 brdf_diff = kLambda
+				* (1.0 - CoupledBRDFVelvet::specularAlbedo().sample(alpha, cos_term_wo))
+				* (1.0 - CoupledBRDFVelvet::specularAlbedo().sample(alpha, cos_term_wi))
+				/ (glm::pi<double>() * (1.0 - CoupledBRDFVelvet::specularAvgAlbedo().sample(alpha)));
+			return brdf_spec + brdf_diff;
+		}
+
+		glm::dvec3 sample(PeseudoRandom *random, const glm::dvec3 &wo) const override {
+			glm::dvec3 wi;
+			double spAlbedo = CoupledBRDFVelvet::specularAlbedo().sample(alpha, glm::dot(Ng, wo));
+
+			if (random->uniform() < spAlbedo) {
+				wi = UniformHemisphereSampler::sample(random, Ng);
+			}
+			else {
+				double theta = CoupledBRDFVelvet::sampler().sampleTheta(alpha, random);
+				glm::dvec3 sample = polar_to_cartesian(theta, random->uniform(0.0, glm::two_pi<double>()));
+				ArbitraryBRDFSpace space(Ng);
+				return space.localToGlobal(sample);
+			}
+			return wi;
+		}
+		double pdf(const glm::dvec3 &wo, const glm::dvec3 &sampled_wi) const override {
+			const CoupledBRDFSampler &sampler = CoupledBRDFVelvet::sampler();
+			double theta = std::acos(glm::dot(Ng, sampled_wi));
+
+			double spAlbedo = CoupledBRDFVelvet::specularAlbedo().sample(alpha, glm::dot(Ng, wo));
+
+			int n = sampler.thetaSize(alpha);
+			double pDiscrete = sampler.probability(alpha, theta);
+			double pdf_omega =
+				spAlbedo * UniformHemisphereSampler::pdf(sampled_wi, Ng)
+				+
+				(1.0 - spAlbedo) * n / (glm::pi<double>() * glm::pi<double>() * std::sin(theta)) * pDiscrete;
+			return pdf_omega;
+		}
+	};
+
 	//class UndefinedMaterial : public IMaterial {
 	//public:
 	//	bool can_direct_sampling() const override {
@@ -579,6 +644,7 @@ namespace rt {
 		MicrofacetCoupledConductorMaterial,
 		MicrofacetCoupledDielectricsMaterial,
 		MicrofacetVelvetMaterial,
+		MicrofacetVelvetEnergyLossMaterial,
 		HeitzConductorMaterial
 	> Material;
 

@@ -88,10 +88,72 @@ void bake_avg(const char *albedoFile, const char *dstName) {
 	saveAsBinary(avg, ofToDataPath(dstName).c_str());
 }
 
+// velvet
+inline void bake_velvet(std::string name) {
+	rt::SpecularAlbedo albedo;
+	albedo.build(kBakeResolution, kBakeResolution, [&](double alpha, double cosTheta) {
+		using namespace rt;
+		glm::dvec3 wo = glm::dvec3(std::sqrt(1.0 - cosTheta * cosTheta), 0.0, cosTheta);
+		glm::dvec3 Ng(0.0, 0.0, 1.0);
+
+		MicrofacetVelvetEnergyLossMaterial m;
+		m.Ng = Ng;
+		m.alpha = alpha;
+
+		//int SampleCount = 100000;
+		int SampleCount = 300000;
+		Xor64 random;
+
+		OnlineMean<double> mean;
+		for (int i = 0; i < SampleCount; ++i) {
+			glm::dvec3 wi = m.sample(&random, wo);
+			double pdf_omega = m.pdf(wo, wi);
+
+			double brdf = m.bxdf(wo, wi).x;
+			double cos_term_wi = glm::dot(wi, Ng);
+			double value = brdf * cos_term_wi / pdf_omega;
+
+			// wiが裏面
+			if (glm::dot(wi, Ng) <= 0.0) {
+				value = 0.0;
+			}
+
+			if (glm::isfinite(value) == false) {
+				value = 0.0;
+			}
+
+			if (value < 0.0) {
+				printf("?");
+			}
+
+			mean.addSample(value);
+		}
+		// return mean.mean();
+		// alpha が低いとき、一部でエネルギーをオーバーする。
+		// ただごく一部であり、今回は気にせずクランプすることにする。
+		return std::min(mean.mean(), 1.0);
+	});
+	saveAsBinary(albedo, ofToDataPath(name + ".bin").c_str());
+
+	// preview
+	ofFloatImage image;
+	image.allocate(albedo.alphaSize(), albedo.cosThetaSize(), OF_IMAGE_GRAYSCALE);
+	float *p = image.getPixels().getPixels();
+	for (int j = 0; j < albedo.cosThetaSize(); ++j) {
+		for (int i = 0; i < albedo.alphaSize(); ++i) {
+			double value = albedo.get(i, j);
+			p[j * albedo.alphaSize() + i] = value;
+		}
+	}
+	image.save(name + ".exr");
+}
 
 //--------------------------------------------------------------
 void ofApp::setup() {
 	ofxImGuiLite::initialize();
+	//rt::Stopwatch sw;
+	//bake_velvet("albedo_velvet");
+	//printf("done %f seconds\n", sw.elapsed());
 
 	 //rt::Stopwatch sw;
 	 //bake("albedo_specular_conductor", false);
@@ -100,6 +162,7 @@ void ofApp::setup() {
 
 	 // bake_avg("albedo_specular_conductor.bin", "albedo_specular_conductor_avg.bin");
 	 // bake_avg("albedo_specular_dielectrics.bin", "albedo_specular_dielectrics_avg.bin");
+	bake_avg("albedo_velvet.bin", "albedo_velvet_avg.bin");
 
 	ofSetVerticalSync(false);
 
@@ -133,7 +196,7 @@ void ofApp::setup() {
 	//{
 	//	glm::dvec3 Ng(0, 0, 1);
 	//	for (int j = 0; j < 32; ++j) {
-	//		double alpha = random.uniform(0.5, 1.0);
+	//		double alpha = random.uniform(0.01, 0.1);
 	//		glm::dvec3 wo = LambertianSampler::sample(&random, Ng);
 	//		double cosThetaO = wo.z;
 
@@ -221,6 +284,18 @@ void ofApp::draw(){
 			line.addVertex(x, y);
 		}
 		ofSetColor(255);
+		line.draw();
+	}
+	{
+		ofPolyline line;
+		int N = 1000;
+		rt::LinearTransform<double> theta(0.0, N - 1, 0.0, 1.0);
+		for (int i = 0; i < N; ++i) {
+			double x = theta(i);
+			double y = rt::velvet_G1(std::cos(x), rouphness);
+			line.addVertex(x, y);
+		}
+		ofSetColor(255, 0, 0);
 		line.draw();
 	}
 

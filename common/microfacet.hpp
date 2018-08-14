@@ -169,13 +169,21 @@ namespace rt {
 		}
 		return std::exp(2.0 * velvet_L(0.5, r) - velvet_L(1.0 - cosTheta, r));
 	}
+	//inline double velvet_lambda_dot(double cosTheta, double r) {
+	//	return std::pow(velvet_lambda(cosTheta, r), 1.0 + 2.0 * std::pow(1.0 - cosTheta, 8));
+	//}
 	inline double velvet_G1(double cosTheta, double r) {
 		return chi_plus(cosTheta) / (1.0 + velvet_lambda(cosTheta, r));
 	}
 	inline double velvet_G2(double cosThetaO, double cosThetaI, double r) {
 		return chi_plus(cosThetaO) * chi_plus(cosThetaI) / (1.0 + velvet_lambda(cosThetaO, r) + velvet_lambda(cosThetaI, r));
 	}
-
+	//inline double velvet_G1_dot(double cosTheta, double r) {
+	//	return chi_plus(cosTheta) / (1.0 + velvet_lambda_dot(cosTheta, r));
+	//}
+	//inline double velvet_G2_dot(double cosThetaO, double cosThetaI, double r) {
+	//	return chi_plus(cosThetaO) * chi_plus(cosThetaI) / (1.0 + velvet_lambda_dot(cosThetaO, r) + velvet_lambda_dot(cosThetaI, r));
+	//}
 	// まだうまく動作しない
 	struct VelvetSampler {
 		// サンプリング範囲が半球ではないことに注意
@@ -375,6 +383,29 @@ namespace rt {
 			loadFromBinary(specularAvgAlbedo(), specularAvgAlbedoBin);
 			sampler().build([](double alpha, double cosTheta) {
 				return rt::CoupledBRDFDielectrics::specularAlbedo().sample(alpha, cosTheta);
+			});
+		}
+	};
+
+	class CoupledBRDFVelvet {
+	public:
+		static SpecularAlbedo & specularAlbedo() {
+			static SpecularAlbedo s_specularAlbedo;
+			return s_specularAlbedo;
+		}
+		static SpecularAvgAlbedo& specularAvgAlbedo() {
+			static SpecularAvgAlbedo s_specularAvgAlbedo;
+			return s_specularAvgAlbedo;
+		}
+		static CoupledBRDFSampler &sampler() {
+			static CoupledBRDFSampler s_sampler;
+			return s_sampler;
+		}
+		static void load(const char *specularAlbedoBin, const char *specularAvgAlbedoBin) {
+			loadFromBinary(specularAlbedo(), specularAlbedoBin);
+			loadFromBinary(specularAvgAlbedo(), specularAvgAlbedoBin);
+			sampler().build([](double alpha, double cosTheta) {
+				return rt::CoupledBRDFVelvet::specularAlbedo().sample(alpha, cosTheta);
 			});
 		}
 	};
