@@ -21,6 +21,8 @@ namespace rt {
 			x2 * two_sqrt_one_minus_s,
 			1.0 - 2.0 * S);
 	}
+
+	// z up
 	inline glm::dvec3 sample_on_unit_hemisphere(PeseudoRandom *random) {
 		double x1;
 		double x2;

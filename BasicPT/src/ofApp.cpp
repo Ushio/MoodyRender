@@ -298,11 +298,11 @@ namespace rt {
 	//	return std::exp(-double(sum) / k);
 	//}
 
-#define ENABLE_NEE 1
-#define ENABLE_NEE_MIS 1
+#define ENABLE_NEE 0
+#define ENABLE_NEE_MIS 0
 	inline glm::dvec3 radiance(const rt::SceneInterface &scene, glm::dvec3 ro, glm::dvec3 rd, PeseudoRandom *random) {
-		// const double kSceneEPS = scene.adaptiveEps();
-		const double kSceneEPS = 1.0e-6;
+		const double kSceneEPS = scene.adaptiveEps();
+		// const double kSceneEPS = 1.0e-6;
 		const double kValueEPS = 1.0e-6;
 
 		glm::dvec3 Lo;

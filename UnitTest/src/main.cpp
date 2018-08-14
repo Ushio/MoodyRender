@@ -16,6 +16,7 @@
 #include "serializable_buffer.hpp"
 #include "material.hpp"
 #include "geometry.hpp"
+#include "randomsampler.hpp"
 
 TEST_CASE("online", "[online]") {
 	SECTION("online") {
@@ -362,7 +363,7 @@ TEST_CASE("ArbitraryBRDFSpace", "[ArbitraryBRDFSpace]") {
 	SECTION("ArbitraryBRDFSpace") {
 		rt::Xor64 *random = new rt::Xor64();
 		for (int j = 0; j < 1000000; ++j) {
-			auto zAxis = uniform_on_unit_sphere(random);
+			auto zAxis = sample_on_unit_sphere(random);
 			ArbitraryBRDFSpace space(zAxis);
 
 			REQUIRE(glm::abs(glm::dot(space.xaxis, space.yaxis)) < 1.0e-15);
@@ -374,7 +375,7 @@ TEST_CASE("ArbitraryBRDFSpace", "[ArbitraryBRDFSpace]") {
 				REQUIRE(glm::abs(space.zaxis[j] - maybe_zaxis[j]) < 1.0e-15);
 			}
 
-			auto anyvector = uniform_on_unit_sphere(random);
+			auto anyvector = sample_on_unit_sphere(random);
 			auto samevector = space.localToGlobal(space.globalToLocal(anyvector));
 
 			for (int j = 0; j < 3; ++j) {
@@ -384,15 +385,62 @@ TEST_CASE("ArbitraryBRDFSpace", "[ArbitraryBRDFSpace]") {
 	}
 }
 
+
+TEST_CASE("Velvet", "[Velvet]") {
+	using namespace rt;
+	rt::XoroshiroPlus128 random;
+	SECTION("D Normalization") {
+		for (int j = 0; j < 128; ++j) {
+			// alphaが小さい場合、simpsonによる積分が適さない
+			double alpha = random.uniform(0.1, 1.0);
+
+			double result = hemisphere_composite_simpson<double>([&](double theta, double phi) {
+				glm::dvec3 wi = rt::polar_to_cartesian((double)theta, (double)phi);
+				glm::dvec3 Ng(0.0, 0.0, 1.0);
+				glm::dvec3 sample_m = rt::polar_to_cartesian((double)theta, (double)phi);
+				double cosTheta = glm::dot(Ng, sample_m);
+				double value = rt::velvet_D(Ng, sample_m, alpha) * cosTheta;
+				return (double)value;
+			}, 64);
+			CAPTURE(alpha);
+			CAPTURE(result);
+			REQUIRE(glm::abs(result - 1.0) < 1.0e-5);
+		}
+	}
+	SECTION("visible normal normalization") {
+		glm::dvec3 Ng(0, 0, 1);
+		for (int j = 0; j < 32; ++j) {
+			double alpha = random.uniform(0.5, 1.0);
+			glm::dvec3 wo = LambertianSampler::sample(&random, Ng);
+			double cosThetaO = wo.z;
+
+			double result = hemisphere_composite_simpson<double>([&](double theta, double phi) {
+				glm::dvec3 h = rt::polar_to_cartesian((double)theta, (double)phi);
+				double D = velvet_D(Ng, h, alpha);
+				double G = velvet_G1(cosThetaO, alpha);
+				double value = G * std::max(glm::dot(wo, h), 0.0) * D / cosThetaO;
+				return value;
+			}, 1000);
+
+			// フィッティングなので、だいたいしか合わない
+			CAPTURE(alpha);
+			CAPTURE(result);
+			REQUIRE(glm::abs(result - 1.0) < 0.05);
+			// printf("%f, a = %f, cosTheta = %f\n", result, alpha, cosThetaO);
+		}
+	}
+}
+
 int main(int argc, char* const argv[])
 {
-#if 0
+#if 1
 	// テストを指定する場合
 	char* custom_argv[] = {
 		"",
-		"[microfacet sampling]"
+		//"[microfacet sampling]"
 		//"[ArbitraryBRDFSpace]"
 		//"[microfacet]"
+		"[Velvet]"
 	};
 	Catch::Session().run(sizeof(custom_argv) / sizeof(custom_argv[0]), custom_argv);
 #else

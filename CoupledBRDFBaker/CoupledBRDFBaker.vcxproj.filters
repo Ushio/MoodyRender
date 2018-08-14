@@ -1,24 +1,83 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-	<ItemGroup>
-		<ClCompile Include="src\ofApp.cpp">
-			<Filter>src</Filter>
-		</ClCompile>
-		<ClCompile Include="src\main.cpp">
-			<Filter>src</Filter>
-		</ClCompile>
-	</ItemGroup>
-	<ItemGroup>
-		<Filter Include="src">
-			<UniqueIdentifier>{d8376475-7454-4a24-b08a-aac121d3ad6f}</UniqueIdentifier>
-		</Filter>
-	</ItemGroup>
-	<ItemGroup>
-		<ClInclude Include="src\ofApp.h">
-			<Filter>src</Filter>
-		</ClInclude>
-	</ItemGroup>
-	<ItemGroup>
-		<ResourceCompile Include="icon.rc" />
-	</ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\ofApp.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\addons\ofxImGuiLite\src\ofxImGuiLite.cpp">
+      <Filter>src\ofxImGuiLite\src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\addons\ofxImGuiLite\libs\imgui_demo.cpp">
+      <Filter>src\ofxImGuiLite\libs</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\addons\ofxImGuiLite\libs\imgui_draw.cpp">
+      <Filter>src\ofxImGuiLite\libs</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\addons\ofxImGuiLite\libs\imgui_impl_glfw_gl2.cpp">
+      <Filter>src\ofxImGuiLite\libs</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\addons\ofxImGuiLite\libs\imgui_impl_glfw_gl3.cpp">
+      <Filter>src\ofxImGuiLite\libs</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\addons\ofxImGuiLite\libs\imgui.cpp">
+      <Filter>src\ofxImGuiLite\libs</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="src">
+      <UniqueIdentifier>{d8376475-7454-4a24-b08a-aac121d3ad6f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\ofxImGuiLite">
+      <UniqueIdentifier>{2aaa6f2a-d6fd-41b9-a9c2-f1a2377d0426}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\ofxImGuiLite\src">
+      <UniqueIdentifier>{b996c560-c8d4-4c94-b0d4-e6c3009c8c1a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\ofxImGuiLite\libs">
+      <UniqueIdentifier>{42d0ab73-d204-4323-9d71-9c95dc3f13a7}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\ofApp.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\src\ofxImGuiLite.hpp">
+      <Filter>src\ofxImGuiLite\src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\imgui.h">
+      <Filter>src\ofxImGuiLite\libs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\imgui_impl_glfw_gl2.h">
+      <Filter>src\ofxImGuiLite\libs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\imgui_impl_glfw_gl3.h">
+      <Filter>src\ofxImGuiLite\libs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\imgui_internal.h">
+      <Filter>src\ofxImGuiLite\libs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\stb_rect_pack.h">
+      <Filter>src\ofxImGuiLite\libs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\stb_textedit.h">
+      <Filter>src\ofxImGuiLite\libs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\stb_truetype.h">
+      <Filter>src\ofxImGuiLite\libs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\imconfig.h">
+      <Filter>src\ofxImGuiLite\libs</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="icon.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\addons\ofxImGuiLite\libs\README.md">
+      <Filter>src\ofxImGuiLite\libs</Filter>
+    </None>
+  </ItemGroup>
 </Project>

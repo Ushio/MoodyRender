@@ -126,7 +126,6 @@
       <WarningLevel>Level3</WarningLevel>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <CompileAs>CompileAsCpp</CompileAs>
-      <ObjectFileName>$(IntDir)/%(RelativeDir)/</ObjectFileName>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
@@ -169,7 +168,6 @@
       <WarningLevel>Level3</WarningLevel>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <CompileAs>CompileAsCpp</CompileAs>
-      <ObjectFileName>$(IntDir)/%(RelativeDir)/</ObjectFileName>
     </ClCompile>
     <Link>
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
@@ -184,10 +182,25 @@
     <PostBuildEvent />
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\addons\ofxImGuiLite\libs\imgui.cpp" />
+    <ClCompile Include="..\..\..\addons\ofxImGuiLite\libs\imgui_demo.cpp" />
+    <ClCompile Include="..\..\..\addons\ofxImGuiLite\libs\imgui_draw.cpp" />
+    <ClCompile Include="..\..\..\addons\ofxImGuiLite\libs\imgui_impl_glfw_gl2.cpp" />
+    <ClCompile Include="..\..\..\addons\ofxImGuiLite\libs\imgui_impl_glfw_gl3.cpp" />
+    <ClCompile Include="..\..\..\addons\ofxImGuiLite\src\ofxImGuiLite.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\ofApp.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\imconfig.h" />
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\imgui.h" />
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\imgui_impl_glfw_gl2.h" />
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\imgui_impl_glfw_gl3.h" />
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\imgui_internal.h" />
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\stb_rect_pack.h" />
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\stb_textedit.h" />
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\stb_truetype.h" />
+    <ClInclude Include="..\..\..\addons\ofxImGuiLite\src\ofxImGuiLite.hpp" />
     <ClInclude Include="src\ofApp.h" />
   </ItemGroup>
   <ItemGroup>
@@ -201,6 +214,9 @@
       <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/D_DEBUG %(AdditionalOptions)</AdditionalOptions>
       <AdditionalIncludeDirectories>$(OF_ROOT)\libs\openFrameworksCompiled\project\vs</AdditionalIncludeDirectories>
     </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\addons\ofxImGuiLite\libs\README.md" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ProjectExtensions>

@@ -509,15 +509,14 @@ namespace rt {
 				}
 				geom.primitives[primID].material = HeitzConductorMaterial(alpha);
 			}
-			//else if (materialString == MicrofacetVelvetMaterialString) {
-			//	MicrofacetVelvetMaterial m;
-			//	double rouphness;
-			//	if (abcGeom.getAttribute("roughness", primID, &rouphness)) {
-			//		// m.alpha = rouphnessToAlpha(rouphness);
-			//		m.alpha = rouphness;
-			//	}
-			//	geom.primitives[primID].material = m;
-			//}
+			else if (materialString == MicrofacetVelvetMaterialString) {
+				MicrofacetVelvetMaterial m;
+				double rouphness;
+				if (abcGeom.getAttribute("roughness", primID, &rouphness)) {
+					m.alpha = rouphness;
+				}
+				geom.primitives[primID].material = m;
+			}
 		};
 
 		tbb::parallel_for(tbb::blocked_range<int>(0, abcGeom.primitives.size()), [&](const tbb::blocked_range<int> &range) {

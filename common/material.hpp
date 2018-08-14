@@ -11,6 +11,7 @@
 #include "MicrosurfaceScattering.h"
 #include "stack_based_polymophic_value.hpp"
 #include "direct_sampler.hpp"
+#include "randomsampler.hpp"
 
 namespace rt {
 	// R: 650nm
@@ -24,22 +25,7 @@ namespace rt {
 		// http://mathworld.wolfram.com/SpherePointPicking.html
 		// Marsaglia (1972)
 		static glm::dvec3 sample(PeseudoRandom *random, const glm::dvec3 &Ng) {
-			double x1;
-			double x2;
-			double S;
-			do {
-				x1 = random->uniform(-1.0, 1.0);
-				x2 = random->uniform(-1.0, 1.0);
-				S = x1 * x1 + x2 * x2;
-			} while (S >= 1.0);
-
-			double two_sqrt_one_minus_s = 2.0 * sqrt(1.0 - S);
-			glm::dvec3 d(
-				x1 * two_sqrt_one_minus_s,
-				x2 * two_sqrt_one_minus_s,
-				std::abs(1.0 - 2.0 * S)
-			);
-
+			glm::dvec3 d = sample_on_unit_hemisphere(random);
 			ArbitraryBRDFSpace space(Ng);
 			return space.localToGlobal(d);
 		}
@@ -533,7 +519,6 @@ namespace rt {
 
 	class MicrofacetVelvetMaterial : public IMaterial {
 	public:
-		bool useFresnel = false;
 		double alpha = 0.2;
 
 		glm::dvec3 bxdf(const glm::dvec3 &wo, const glm::dvec3 &wi) const override {
@@ -546,35 +531,28 @@ namespace rt {
 			}
 
 			glm::dvec3 h = glm::normalize(wi + wo);
-			double d = D_velvet(Ng, h, alpha);
-			// double g = G2_height_correlated_beckmann(wi, wo, h, Ng, alpha);
-			double g = G2_v_cavity(wi, wo, h, Ng);
+			double d = velvet_D(Ng, h, alpha);
+			double g = velvet_G2(cos_term_wo, cos_term_wi, alpha);
 
 			double brdf_without_f = d * g / (4.0 * cos_term_wo * cos_term_wi);
 
 			glm::dvec3 brdf = glm::dvec3(brdf_without_f);
-
-			if (useFresnel) {
-				glm::dvec3 eta(0.15557, 0.42415, 1.3821);
-				glm::dvec3 k(3.6024, 2.4721, 1.9155);
-
-				double cosThetaFresnel = glm::dot(h, wo);
-				glm::dvec3 f = glm::dvec3(
-					fresnel_unpolarized(eta.r, k.r, cosThetaFresnel),
-					fresnel_unpolarized(eta.g, k.g, cosThetaFresnel),
-					fresnel_unpolarized(eta.b, k.b, cosThetaFresnel)
-				);
-				brdf = f * brdf_without_f;
-			}
-
 			return brdf;
 		}
 		glm::dvec3 sample(PeseudoRandom *random, const glm::dvec3 &wo) const override {
-			// return VCavityVelvetVisibleNormalSampler::sample(random, alpha, wo, Ng);
+			// 効果的ではない
+			// return VelvetSampler::sample(random, alpha, wo, Ng);
+
+			// Production Friendly Microfacet Sheen BRDF
+			// によるとこちらのほうが効率的
 			return UniformHemisphereSampler::sample(random, Ng);
 		}
 		double pdf(const glm::dvec3 &wo, const glm::dvec3 &sampled_wi) const override {
-			// return VCavityVelvetVisibleNormalSampler::pdf(sampled_wi, alpha, wo, Ng);
+			// 効果的ではない
+			// return VelvetSampler::pdf(sampled_wi, alpha, wo, Ng);
+
+			// Production Friendly Microfacet Sheen BRDF
+			// によるとこちらのほうが効率的
 			return UniformHemisphereSampler::pdf(sampled_wi, Ng);
 		}
 	};
@@ -600,6 +578,7 @@ namespace rt {
 		MicrofacetConductorMaterial,
 		MicrofacetCoupledConductorMaterial,
 		MicrofacetCoupledDielectricsMaterial,
+		MicrofacetVelvetMaterial,
 		HeitzConductorMaterial
 	> Material;
 

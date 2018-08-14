@@ -8,6 +8,8 @@
 #include "composite_simpson.hpp"
 #include "simpson_helper.hpp"
 #include "linear_transform.hpp"
+#include "material.hpp"
+#include "ofxImGuiLite.hpp"
 
 static const int kBakeResolution = 64;
 
@@ -37,7 +39,7 @@ inline void bake(std::string name, bool include_fresnel_dielectrics) {
 			double brdf = d * g / (4.0 * cos_term_wo * cos_term_wi);
 			if (include_fresnel_dielectrics) {
 				double cosThetaFresnel = glm::dot(h, wo); // == glm::dot(h, wi)
-				double f = fresnel_dielectrics(cosThetaFresnel);
+				double f = fresnel_dielectrics(cosThetaFresnel, 1.5, 1.0);
 				brdf *= f;
 			}
 
@@ -89,12 +91,14 @@ void bake_avg(const char *albedoFile, const char *dstName) {
 
 //--------------------------------------------------------------
 void ofApp::setup() {
+	ofxImGuiLite::initialize();
+
 	 //rt::Stopwatch sw;
 	 //bake("albedo_specular_conductor", false);
 	 //bake("albedo_specular_dielectrics", true);
 	 //printf("done %f seconds\n", sw.elapsed());
 
-	 bake_avg("albedo_specular_conductor.bin", "albedo_specular_conductor_avg.bin");
+	 // bake_avg("albedo_specular_conductor.bin", "albedo_specular_conductor_avg.bin");
 	 // bake_avg("albedo_specular_dielectrics.bin", "albedo_specular_dielectrics_avg.bin");
 
 	ofSetVerticalSync(false);
@@ -105,6 +109,45 @@ void ofApp::setup() {
 
 	// rt::CoupledBRDFConductor::load(ofToDataPath("albedo_specular_conductor.xml").c_str(), ofToDataPath("albedo_specular_conductor_avg.xml").c_str());
 	// rt::CoupledBRDFDielectrics::load(ofToDataPath("albedo_specular_dielectrics.xml").c_str(), ofToDataPath("albedo_specular_dielectrics_avg.xml").c_str());
+
+	using namespace rt;
+	rt::XoroshiroPlus128 random;
+	//{
+	//	for (int j = 0; j < 32; ++j) {
+	//		// alphaが小さい場合、simpsonによる積分が適さない
+	//		double alpha = random.uniform(0.1, 1.0);
+
+	//		double result = hemisphere_composite_simpson<double>([&](double theta, double phi) {
+	//			glm::dvec3 wi = rt::polar_to_cartesian((double)theta, (double)phi);
+	//			glm::dvec3 Ng(0.0, 0.0, 1.0);
+	//			glm::dvec3 sample_m = rt::polar_to_cartesian((double)theta, (double)phi);
+	//			double cosTheta = glm::dot(Ng, sample_m);
+	//			double value = rt::velvet_D(Ng, sample_m, alpha) * cosTheta;
+	//			return (double)value;
+	//		}, 500);
+	//		printf("%f\n", result);
+	//	}
+	//}
+
+	// visible normal normalization
+	//{
+	//	glm::dvec3 Ng(0, 0, 1);
+	//	for (int j = 0; j < 32; ++j) {
+	//		double alpha = random.uniform(0.5, 1.0);
+	//		glm::dvec3 wo = LambertianSampler::sample(&random, Ng);
+	//		double cosThetaO = wo.z;
+
+	//		double result = hemisphere_composite_simpson<double>([&](double theta, double phi) {
+	//			glm::dvec3 h = rt::polar_to_cartesian((double)theta, (double)phi);
+	//			double D = velvet_D(Ng, h, alpha);
+	//			double G = velvet_G1(cosThetaO, alpha);
+	//			double value = G * std::max(glm::dot(wo, h), 0.0) * D / cosThetaO;
+	//			return value;
+	//		}, 1000);
+	//		printf("%f, a = %f, cosTheta = %f\n", result, alpha, cosThetaO);
+	//	}
+	//}
+
 }
 
 //--------------------------------------------------------------
@@ -119,7 +162,7 @@ void ofApp::draw(){
 	ofClear(0);
 	_camera.begin();
 	ofPushMatrix();
-	ofRotateZ(90.0);
+	ofRotateY(90.0);
 	ofSetColor(64);
 	ofDrawGridPlane(1.0);
 	ofPopMatrix();
@@ -166,11 +209,44 @@ void ofApp::draw(){
 	//	mesh.draw();
 	//}
 
+	static float rouphness = 0.5f;
+
+	{
+		ofPolyline line;
+		int N = 1000;
+		rt::LinearTransform<double> theta(0.0, N - 1, 0.0, 1.0);
+		for (int i = 0; i < N; ++i) {
+			double x = theta(i);
+			double y = rt::velvet_G1(std::cos(x), rouphness);
+			line.addVertex(x, y);
+		}
+		ofSetColor(255);
+		line.draw();
+	}
+
 	_camera.end();
 
 	ofDisableDepthTest();
 	ofSetColor(255);
 
+	ofxImGuiLite::ScopedImGui imgui;
+
+	// camera control                                          for control clicked problem
+	if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow) || (ImGui::IsAnyWindowFocused() && ImGui::IsAnyMouseDown())) {
+		_camera.disableMouseInput();
+	}
+	else {
+		_camera.enableMouseInput();
+	}
+
+	ImGui::SetNextWindowPos(ImVec2(20, 20), ImGuiSetCond_Appearing);
+	ImGui::SetNextWindowSize(ImVec2(700, 600), ImGuiSetCond_Appearing);
+	ImGui::SetNextWindowCollapsed(false, ImGuiSetCond_Appearing);
+	ImGui::SetNextWindowBgAlpha(0.5f);
+
+	ImGui::Begin("settings", nullptr);
+	ImGui::SliderFloat("rouphness", &rouphness, 0.0f, 1.0f);
+	ImGui::End();
 }
 
 //--------------------------------------------------------------

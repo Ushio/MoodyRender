@@ -133,16 +133,50 @@ namespace rt {
 		}
 	};
 
-	double D_velvet(const glm::dvec3 &n, const glm::dvec3 &h, double r) {
+	inline double velvet_D(const glm::dvec3 &n, const glm::dvec3 &h, double r) {
 		double cosTheta = glm::dot(n, h);
 		if (cosTheta < 0.0) {
 			return 0.0;
 		}
-		// double sinTheta = std::sqrt(1.0 - cosTheta * cosTheta);
-		double sinTheta = std::sin(std::acos(cosTheta));
+		// double sinTheta = std::sin(std::acos(cosTheta));
+		double sinTheta = std::sqrt(std::max(1.0 - cosTheta * cosTheta, 0.0));
 		return (2.0 + 1.0 / r) * std::pow(sinTheta, 1.0 / r) / (glm::pi<double>() * 2.0);
 	}
 
+	// a, b, c, d, e
+	// power_of_one_minus_r = (1-r)^2
+	inline double velvet_params_interpolate(int i, double power_of_one_minus_r) {
+		static const double p0[5] = { 25.3245, 3.32435, 0.16801, -1.27393, -4.85967 };
+		static const double p1[5] = { 21.5473, 3.82987, 0.19823, -1.97760, -4.32054 };
+		// k * p0 + (1 - k) * p1
+		// k * p0 + p1 - k * p1
+		// p1 + k * (p0 - p1);
+		return glm::mix(p1[i], p0[i], power_of_one_minus_r);
+	}
+	inline double velvet_L(double x, double r) {
+		double one_minus_r = 1.0 - r;
+		double power_of_one_minus_r = one_minus_r * one_minus_r;
+		double a = velvet_params_interpolate(0, power_of_one_minus_r);
+		double b = velvet_params_interpolate(1, power_of_one_minus_r);
+		double c = velvet_params_interpolate(2, power_of_one_minus_r);
+		double d = velvet_params_interpolate(3, power_of_one_minus_r);
+		double e = velvet_params_interpolate(4, power_of_one_minus_r);
+		return a / (1.0 + b * std::pow(x, c)) + d * x + e;
+	}
+	inline double velvet_lambda(double cosTheta, double r) {
+		if (cosTheta < 0.5) {
+			return std::exp(velvet_L(cosTheta, r));
+		}
+		return std::exp(2.0 * velvet_L(0.5, r) - velvet_L(1.0 - cosTheta, r));
+	}
+	inline double velvet_G1(double cosTheta, double r) {
+		return chi_plus(cosTheta) / (1.0 + velvet_lambda(cosTheta, r));
+	}
+	inline double velvet_G2(double cosThetaO, double cosThetaI, double r) {
+		return chi_plus(cosThetaO) * chi_plus(cosThetaI) / (1.0 + velvet_lambda(cosThetaO, r) + velvet_lambda(cosThetaI, r));
+	}
+
+	// まだうまく動作しない
 	struct VelvetSampler {
 		// サンプリング範囲が半球ではないことに注意
 		static glm::dvec3 sample(PeseudoRandom *random, double alpha, glm::dvec3 wo, glm::dvec3 Ng) {
@@ -151,61 +185,25 @@ namespace rt {
 			glm::dvec3 omega_m;
 			{
 				double u = random->uniform();
-				double theta = std::asin(u * (alpha / (alpha * 2.0 + 1.0)));
+				double theta = std::asin(std::pow(u, alpha / (alpha * 2.0 + 1.0)));
 				double phi = random->uniform(0.0, glm::two_pi<double>());
 				omega_m = polar_to_cartesian(theta, phi);
 			}
-			ArbitraryBRDFSpace basis(Ng);
-			return basis.localToGlobal(omega_m);
 			//ArbitraryBRDFSpace basis(Ng);
-			//glm::dvec3 h = basis.localToGlobal(omega_m);
-			//glm::dvec3 wi = glm::reflect(-wo, h);
-			//return wi;
+			//return basis.localToGlobal(omega_m);
+			ArbitraryBRDFSpace basis(Ng);
+			glm::dvec3 h = basis.localToGlobal(omega_m);
+			glm::dvec3 wi = glm::reflect(-wo, h);
+			return wi;
 		}
 		// 裏面はサポートしない
 		static double pdf(glm::dvec3 sampled_wi, double alpha, glm::dvec3 wo, glm::dvec3 Ng) {
 			glm::dvec3 half = glm::normalize(sampled_wi + wo);
-			double pdf_m = D_velvet(Ng, half, alpha) * glm::dot(Ng, half);
+			double pdf_m = velvet_D(Ng, half, alpha) * glm::dot(Ng, half);
 
 			// glm::dot(sampled_wi, half)が0になるのは、
 			// wiとwoが正反対の向き、つまりかならず裏側であるので、普段は問題にならない
 			return pdf_m / (4.0 * glm::dot(sampled_wi, half));
-		}
-	};
-	struct VCavityVelvetVisibleNormalSampler {
-		static glm::dvec3 sample(PeseudoRandom *random, double alpha, glm::dvec3 wo, glm::dvec3 Ng) {
-			double phi = random->uniform(0.0, glm::two_pi<double>());
-
-			glm::dvec3 omega_m;
-			{
-				double u = random->uniform();
-				double theta = std::asin(u * (alpha / (alpha * 2.0 + 1.0)));
-				double phi = random->uniform(0.0, glm::two_pi<double>());
-				omega_m = polar_to_cartesian(theta, phi);
-			}
-
-			// glm::dvec3 omega_m = BeckmannMicrosurfaceImportanceSampler::sample(random, alpha);
-			glm::dvec3 omega_m_dot = glm::dvec3(-omega_m.x, -omega_m.y, omega_m.z);
-
-			ArbitraryBRDFSpace basis(Ng);
-			glm::dvec3 wo_local = basis.globalToLocal(wo);
-
-			double visible = glm::max(glm::dot(wo_local, omega_m), 0.0);
-			double visible_dot = glm::max(glm::dot(wo_local, omega_m_dot), 0.0);
-			double u = visible_dot / (visible + visible_dot);
-
-			glm::dvec3 sample = random->uniform() < u ? omega_m_dot : omega_m;
-
-			glm::dvec3 h = basis.localToGlobal(sample);
-			glm::dvec3 wi = glm::reflect(-wo, h);
-			return wi;
-		}
-
-		// 裏面はサポートしない
-		static double pdf(glm::dvec3 sampled_wi, double alpha, glm::dvec3 wo, glm::dvec3 Ng) {
-			glm::dvec3 wm = glm::normalize(sampled_wi + wo);
-			double cosThetaO = glm::dot(wo, Ng);
-			return G1_v_cavity(wo, wm, Ng) * glm::max(glm::dot(wo, wm), 0.0) * D_velvet(Ng, wm, alpha) / (cosThetaO * (4.0 * glm::dot(sampled_wi, wm)));
 		}
 	};
 
