@@ -21,6 +21,8 @@ public:
 	void dragEvent(ofDragInfo dragInfo);
 	void gotMessage(ofMessage msg);
 
+	void loadScene();
+
 	ofEasyCam _camera;
 	ofImage _image;
 	bool _render = true;

@@ -639,16 +639,6 @@ void ofApp::setup() {
 	_camera.setFarClip(100.0);
 	_camera.setDistance(5.0);
 
-	rt::Stopwatch sw;
-
-	scene = std::shared_ptr<rt::Scene>(new rt::Scene());
-	rt::loadFromABC(ofToDataPath("cornelbox.abc").c_str(), *scene);
-	// rt::loadFromABC(ofToDataPath("mitsuba.abc").c_str(), *scene);
-
-	printf("load scene %f seconds\n", sw.elapsed());
-	
-	renderer = std::shared_ptr<rt::PTRenderer>(new rt::PTRenderer(scene));
-
 	rt::CoupledBRDFConductor::load(
 		ofToDataPath("baked/albedo_specular_conductor.bin").c_str(),
 		ofToDataPath("baked/albedo_specular_conductor_avg.bin").c_str());
@@ -659,13 +649,24 @@ void ofApp::setup() {
 	rt::CoupledBRDFVelvet::load(
 		ofToDataPath("baked/albedo_velvet.bin").c_str(),
 		ofToDataPath("baked/albedo_velvet_avg.bin").c_str());
+
+	loadScene();
 }
 void ofApp::exit() {
 	// ofxImGuiLite::shutdown();
 }
+
+void ofApp::loadScene() {
+	rt::Stopwatch sw;
+
+	scene = std::shared_ptr<rt::Scene>(new rt::Scene());
+	rt::loadFromABC(ofToDataPath("cornelbox.abc").c_str(), *scene);
+	printf("load scene %f seconds\n", sw.elapsed());
+
+	renderer = std::shared_ptr<rt::PTRenderer>(new rt::PTRenderer(scene));
+}
 //--------------------------------------------------------------
 void ofApp::update() {
-
 }
 
 //--------------------------------------------------------------
@@ -818,6 +819,10 @@ void ofApp::keyPressed(int key) {
 	if (key == 's') {
 		ofFloatImage image = toOfLinear(renderer->_image);
 		image.save("pt.exr");
+	}
+
+	if (key == 'r') {
+		loadScene();
 	}
 }
 

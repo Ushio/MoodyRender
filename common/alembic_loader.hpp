@@ -538,10 +538,15 @@ namespace rt {
 	}
 
 	inline void loadFromABC(const char *filename, Scene &scene) {
-		IArchive archive(Alembic::AbcCoreOgawa::ReadArchive(), filename);
-		IObject top(archive, kTop);
-		rt::printHierarchy(top);
+		try {
+			IArchive archive(Alembic::AbcCoreOgawa::ReadArchive(), filename);
+			IObject top(archive, kTop);
+			rt::printHierarchy(top);
 
-		rt::parseHierarchy(top, scene, geometryMaterialBinding);
+			rt::parseHierarchy(top, scene, geometryMaterialBinding);
+		}
+		catch (std::exception &e) {
+			printf("abc archive load failed.. %s\n", e.what());
+		}
 	}
 }
