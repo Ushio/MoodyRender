@@ -80,6 +80,12 @@
     <ClInclude Include="..\..\..\addons\ofxImGuiLite\src\ofxImGuiLite.hpp">
       <Filter>src\ofxImGuiLite\src</Filter>
     </ClInclude>
+    <ClInclude Include="..\common\scene_interface.hpp">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\integrator.hpp">
+      <Filter>src</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="icon.rc" />

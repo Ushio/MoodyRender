@@ -212,7 +212,9 @@
     <ClInclude Include="..\..\..\addons\ofxImGuiLite\libs\stb_truetype.h" />
     <ClInclude Include="..\..\..\addons\ofxImGuiLite\src\ofxImGuiLite.hpp" />
     <ClInclude Include="..\common\direct_sampler.hpp" />
+    <ClInclude Include="..\common\integrator.hpp" />
     <ClInclude Include="..\common\MicrosurfaceScattering.h" />
+    <ClInclude Include="..\common\scene_interface.hpp" />
     <ClInclude Include="src\ofApp.h" />
   </ItemGroup>
   <ItemGroup>
