@@ -51,9 +51,11 @@ namespace rt {
 		std::vector<Pixel> _pixels;
 		std::vector<XoroshiroPlus128> _randoms;
 	};
-
+	inline double GTerm(double cosThetaP, double cosThetaQ, double r2) {
+		return cosThetaP * cosThetaQ / r2;
+	}
 	inline double GTerm(const glm::dvec3 &p, double cosThetaP, const glm::dvec3 &q, double cosThetaQ) {
-		return cosThetaP * cosThetaQ / glm::distance2(p, q);
+		return GTerm(cosThetaP, cosThetaQ, glm::distance2(p, q));
 	}
 
 	inline bool has_value(const glm::dvec3 &c, double eps) {
@@ -103,12 +105,22 @@ namespace rt {
 						// 簡単なテスト
 						// if (std::abs(pdf_area - (*it)->pdf_area(p, q)) > 1.0e-6) { abort(); }
 
-						glm::dvec3 wi = glm::normalize(q - p);
-						glm::dvec3 bxdf = m->bxdf(wo, wi);
+						double pqDistance2 = glm::distance2(p, q);
+						glm::dvec3 wi = (q - p) / std::sqrt(pqDistance2);
+						
 						double cosThetaP = glm::dot(m->Ng, wi);
+
+						// 裏側に光源があるので早期棄却
+						if (cosThetaP < 0.0) {
+							continue;
+						}
+
+						// これはcan_sampleにおいてすでに裏面でないことが保証されている
 						double cosThetaQ = glm::dot(n, -wi);
 
-						double g = GTerm(p, cosThetaP, q, cosThetaQ);
+						glm::dvec3 bxdf = m->bxdf(wo, wi);
+
+						double g = GTerm(cosThetaP, cosThetaQ, pqDistance2);
 
 						glm::dvec3 contribution = T * bxdf * Le * g / pdf_area;
 
@@ -116,7 +128,7 @@ namespace rt {
 							if (scene.occluded(p + m->Ng * kSceneEPS, q + n * kSceneEPS) == false) {
 #if ENABLE_NEE_MIS
 								double this_pdf = pdf_area;
-								double other_pdf = m->pdf(wo, wi) * glm::dot(-n, wi) / glm::distance2(p, q);
+								double other_pdf = m->pdf(wo, wi) * glm::dot(-n, wi) / pqDistance2;
 								// double mis_weight = this_pdf / (this_pdf + other_pdf);
 								double mis_weight = this_pdf * this_pdf / (this_pdf * this_pdf + other_pdf * other_pdf);
 								Lo += contribution * mis_weight;
