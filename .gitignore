@@ -94,9 +94,13 @@ scenes/backup
 scene_cache
 cornelbox.abc
 
+
+
 # vs addition
 .vs
 *.dll
 *.lib
 *.exp
 *.exe
+
+!vcomp120.dll

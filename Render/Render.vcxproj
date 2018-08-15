@@ -137,9 +137,25 @@
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent />
+    <PreBuildEvent />
+    <PreLinkEvent>
+      <Command>
+      </Command>
+    </PreLinkEvent>
     <PreBuildEvent>
-      <Command>robocopy "c:\windows\system32" $(TargetDir) msvcp140.dll
-robocopy "c:\windows\system32" $(TargetDir) vcruntime140.dll</Command>
+      <Command>del $(TargetDir)Alembic.dll
+del $(TargetDir)Half.dll
+del $(TargetDir)Iex-2_2.dll
+del $(TargetDir)Imath-2_2.dll
+
+robocopy "$(ProjectDir)../dll" $(TargetDir) vcomp120.dll
+
+robocopy "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Redist\MSVC\14.14.26405\x64\Microsoft.VC141.CRT" $(TargetDir) msvcp140.dll
+robocopy "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Redist\MSVC\14.14.26405\x64\Microsoft.VC141.CRT" $(TargetDir) msvcp140_1.dll
+robocopy "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Redist\MSVC\14.14.26405\x64\Microsoft.VC141.CRT" $(TargetDir) msvcp140_2.dll
+robocopy "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Redist\MSVC\14.14.26405\x64\Microsoft.VC141.CRT" $(TargetDir) vccorlib140.dll
+robocopy "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Redist\MSVC\14.14.26405\x64\Microsoft.VC141.CRT" $(TargetDir) vcruntime140.dll
+robocopy "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Redist\MSVC\14.14.26405\x64\Microsoft.VC141.CRT" $(TargetDir) concrt140.dll</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -186,9 +202,25 @@ robocopy "c:\windows\system32" $(TargetDir) vcruntime140.dll</Command>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent />
+    <PreBuildEvent />
+    <PreLinkEvent>
+      <Command>
+      </Command>
+    </PreLinkEvent>
     <PreBuildEvent>
-      <Command>robocopy "c:\windows\system32" $(TargetDir) msvcp140.dll
-robocopy "c:\windows\system32" $(TargetDir) vcruntime140.dll</Command>
+      <Command>del $(TargetDir)Alembic.dll
+del $(TargetDir)Half.dll
+del $(TargetDir)Iex-2_2.dll
+del $(TargetDir)Imath-2_2.dll
+
+robocopy "$(ProjectDir)../dll" $(TargetDir) vcomp120.dll
+
+robocopy "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Redist\MSVC\14.14.26405\x64\Microsoft.VC141.CRT" $(TargetDir) msvcp140.dll
+robocopy "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Redist\MSVC\14.14.26405\x64\Microsoft.VC141.CRT" $(TargetDir) msvcp140_1.dll
+robocopy "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Redist\MSVC\14.14.26405\x64\Microsoft.VC141.CRT" $(TargetDir) msvcp140_2.dll
+robocopy "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Redist\MSVC\14.14.26405\x64\Microsoft.VC141.CRT" $(TargetDir) vccorlib140.dll
+robocopy "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Redist\MSVC\14.14.26405\x64\Microsoft.VC141.CRT" $(TargetDir) vcruntime140.dll
+robocopy "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Redist\MSVC\14.14.26405\x64\Microsoft.VC141.CRT" $(TargetDir) concrt140.dll</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
