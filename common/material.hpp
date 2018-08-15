@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+#define ENABLE_HEITZ 0
+
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
 
@@ -8,7 +10,9 @@
 #include "peseudo_random.hpp"
 #include "microfacet.hpp"
 #include "coordinate.hpp"
+#if ENABLE_HEITZ
 #include "MicrosurfaceScattering.h"
+#endif
 #include "stack_based_polymophic_value.hpp"
 #include "direct_sampler.hpp"
 #include "randomsampler.hpp"
@@ -178,7 +182,7 @@ namespace rt {
 		// glm::dvec3 sigma = glm::dvec3(3.0);
 		// glm::dvec3 sigma = glm::dvec3(0.03, 3.0, 3.0);
 		glm::dvec3 sigma = glm::dvec3(0.0);
-		double eta_dielectrics = 1.5;
+		glm::dvec3 eta_dielectrics = glm::dvec3(1.5);
 
 		bool can_direct_sampling() const override {
 			return false;
@@ -191,7 +195,7 @@ namespace rt {
 			return glm::exp(-sigma * through_length);
 		}
 		glm::dvec3 sample(PeseudoRandom *random, const glm::dvec3 &wo) const override {
-			double eta_t = eta_dielectrics;
+			double eta_t = eta_dielectrics.y;
 			double eta_i = 1.0;
 			if (backfacing) {
 				std::swap(eta_i, eta_t);
@@ -214,6 +218,11 @@ namespace rt {
 	public:
 		bool useFresnel = true;
 		double alpha = 0.3;
+
+		glm::dvec3 eta = glm::dvec3(0.15557, 0.42415, 1.3821);
+		glm::dvec3 k = glm::dvec3(3.6024, 2.4721, 1.9155);
+		//glm::dvec3 eta = glm::dvec3(0.23780, 1.0066, 1.2404);
+		//glm::dvec3 k = glm::dvec3(3.6264, 2.5823, 2.3929);
 
 		//bool can_direct_sampling() const override {
 		//	return kDirectSamplingAlphaThreashold <= alpha;
@@ -238,9 +247,6 @@ namespace rt {
 			glm::dvec3 brdf = glm::dvec3(brdf_without_f);
 
 			if (useFresnel) {
-				glm::dvec3 eta(0.15557, 0.42415, 1.3821);
-				glm::dvec3 k(3.6024, 2.4721, 1.9155);
-
 				double cosThetaFresnel = glm::dot(h, wo);
 				glm::dvec3 f = glm::dvec3(
 					fresnel_unpolarized(eta.r, k.r, cosThetaFresnel),
@@ -270,7 +276,12 @@ namespace rt {
 	public:
 		bool useFresnel = true;
 		double alpha = 0.3;
-
+		//glm::dvec3 eta = glm::dvec3(0.15557, 0.42415, 1.3821);
+		//glm::dvec3 k = glm::dvec3(3.6024, 2.4721, 1.9155);
+		//glm::dvec3 eta = glm::dvec3(0.23780, 1.0066, 1.2404);
+		//glm::dvec3 k = glm::dvec3(3.6264, 2.5823, 2.3929);
+		glm::dvec3 eta = glm::dvec3();
+		glm::dvec3 k = glm::dvec3();
 		//bool can_direct_sampling() const override {
 		//	return kDirectSamplingAlphaThreashold <= alpha;
 		//}
@@ -297,8 +308,8 @@ namespace rt {
 			// B: 450nm
 
 			// gold
-			glm::dvec3 eta = glm::dvec3(0.15557, 0.42415, 1.3821);
-			glm::dvec3 k = glm::dvec3(3.6024, 2.4721, 1.9155);
+			// glm::dvec3 eta = glm::dvec3(0.15557, 0.42415, 1.3821);
+			// glm::dvec3 k = glm::dvec3(3.6024, 2.4721, 1.9155);
 
 			// copper (Cu)
 			//glm::dvec3 eta = glm::dvec3(0.23780, 1.0066, 1.2404);
@@ -451,7 +462,7 @@ namespace rt {
 			return pdf_omega;
 		}
 	};
-
+#if ENABLE_HEITZ
 	class HeitzConductorMaterial : public IMaterial {
 	public:
 
@@ -516,6 +527,7 @@ namespace rt {
 		double alpha = 1.0;
 		std::shared_ptr<MicrosurfaceConductor> _microsurfaceConductor[3];
 	};
+#endif
 
 	class MicrofacetVelvetEnergyLossMaterial : public IMaterial {
 	public:
@@ -643,9 +655,10 @@ namespace rt {
 		MicrofacetConductorMaterial,
 		MicrofacetCoupledConductorMaterial,
 		MicrofacetCoupledDielectricsMaterial,
+#if ENABLE_HEITZ
+		HeitzConductorMaterial,
+#endif
 		MicrofacetVelvetMaterial,
-		MicrofacetVelvetEnergyLossMaterial,
-		HeitzConductorMaterial
+		MicrofacetVelvetEnergyLossMaterial
 	> Material;
-
 }

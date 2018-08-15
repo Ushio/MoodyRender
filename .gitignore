@@ -91,6 +91,8 @@ Desktop.ini
 
 # houdini
 scenes/backup
+scene_cache
+cornelbox.abc
 
 # vs addition
 .vs

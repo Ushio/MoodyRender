@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <atomic>
+#include <tbb/tbb.h>
 #include "scene_interface.hpp"
 
 #define DEBUG_MODE 0

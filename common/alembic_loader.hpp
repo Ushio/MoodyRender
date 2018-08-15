@@ -474,6 +474,8 @@ namespace rt {
 				if (abcGeom.getAttribute("roughness", primID, &rouphness)) {
 					m.alpha = rouphnessToAlpha(rouphness);
 				}
+				abcGeom.getAttribute("eta", primID, &m.eta);
+				abcGeom.getAttribute("k", primID, &m.k);
 				geom.primitives[primID].material = m;
 			}
 			else if (materialString == MicrofacetCoupledConductorMaterialString) {
@@ -482,6 +484,8 @@ namespace rt {
 				if (abcGeom.getAttribute("roughness", primID, &rouphness)) {
 					m.alpha = rouphnessToAlpha(rouphness);
 				}
+				abcGeom.getAttribute("eta", primID, &m.eta);
+				abcGeom.getAttribute("k", primID, &m.k);
 				geom.primitives[primID].material = m;
 			}
 			else if (materialString == MicrofacetCoupledDielectricsMaterialString) {
@@ -502,6 +506,7 @@ namespace rt {
 				abcGeom.getAttribute("sigma", primID, &m.sigma);
 				geom.primitives[primID].material = m;
 			}
+#if ENABLE_HEITZ
 			else if (materialString == HeitzConductorMaterialString) {
 				double alpha = 0.5f;
 				double rouphness;
@@ -510,6 +515,7 @@ namespace rt {
 				}
 				geom.primitives[primID].material = HeitzConductorMaterial(alpha);
 			}
+#endif
 			else if (materialString == MicrofacetVelvetMaterialString) {
 				MicrofacetVelvetMaterial m;
 				double rouphness;
