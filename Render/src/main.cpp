@@ -9,6 +9,9 @@
 
 #include "ofMain.h"
 
+static const double kRenderTime = 123.0;
+// static const double kRenderTime = 60 * 60;
+
 inline ofPixels toOf(const rt::Image &image) {
 	ofPixels pixels;
 	pixels.allocate(image.width(), image.height(), OF_IMAGE_COLOR);
@@ -84,5 +87,5 @@ int main( ){
 		sprintf(name, "../../rendered_images/image_%d_spp.jpg", spp);
 		ofSaveImage(image, name);
 		printf("save as %s\n", name);
-	}, 123.0, 15.0);
+	}, kRenderTime, 15.0);
 }
