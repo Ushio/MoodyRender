@@ -195,10 +195,10 @@ namespace rt {
 			return _scene->camera;
 		}
 
-		std::vector<std::unique_ptr<IDirectSampler>>::const_iterator sampler_begin() const {
+		std::vector<IDirectSampler *>::const_iterator sampler_begin() const {
 			return _directSamplers.begin();
 		}
-		std::vector<std::unique_ptr<IDirectSampler>>::const_iterator sampler_end() const {
+		std::vector<IDirectSampler *>::const_iterator sampler_end() const {
 			return _directSamplers.end();
 		}
 		int samplerCount() const {
@@ -210,7 +210,7 @@ namespace rt {
 		RTCScene _embreeScene = nullptr;
 		mutable RTCIntersectContext _context;
 
-		std::vector<std::unique_ptr<IDirectSampler>> _directSamplers;
+		std::vector<IDirectSampler *> _directSamplers;
 
 		double _sceneAdaptiveEps = 0.0f;
 	};

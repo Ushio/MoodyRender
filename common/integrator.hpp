@@ -83,63 +83,65 @@ namespace rt {
 
 			if (scene.intersect(ro, rd, &m, &tmin)) {
 #if ENABLE_NEE
-				// NEE
-				// 最後のNEEは、PTと経路長をあわせるために、やらない
-				if (i != (kDepth - 1)) {
-					glm::dvec3 p = m->p;
-					for (auto it = scene.sampler_begin(); it != scene.sampler_end(); ++it) {
-						glm::dvec3 q;
-						glm::dvec3 n;
-						glm::dvec3 Le;
-						double pdf_area = 0.0;
-
-						if ((*it)->can_sample(p) == false) {
-							continue;
-						}
-
-						if (m->can_direct_sampling() == false) {
-							continue;
-						}
-
-						(*it)->sample(random, p, &q, &n, &Le, &pdf_area);
-
-						// 簡単なテスト
-						// if (std::abs(pdf_area - (*it)->pdf_area(p, q)) > 1.0e-6) { abort(); }
-
-						double pqDistance2 = glm::distance2(p, q);
-						glm::dvec3 wi = (q - p) / std::sqrt(pqDistance2);
-						
-						double cosThetaP = glm::dot(m->Ng, wi);
-
-						// 裏側に光源があるので早期棄却
-						if (cosThetaP < 0.0) {
-							continue;
-						}
-
-						// これはcan_sampleにおいてすでに裏面でないことが保証されている
-						double cosThetaQ = glm::dot(n, -wi);
-
-						glm::dvec3 bxdf = m->bxdf(wo, wi);
-
-						double g = GTerm(cosThetaP, cosThetaQ, pqDistance2);
-
-						glm::dvec3 contribution = T * bxdf * Le * g / pdf_area;
-
-						if (has_value(contribution, kValueEPS)) {
-							if (scene.occluded(p + m->Ng * kSceneEPS, q + n * kSceneEPS) == false) {
-#if ENABLE_NEE_MIS
-								double this_pdf = pdf_area;
-								double other_pdf = m->pdf(wo, wi) * glm::dot(-n, wi) / pqDistance2;
-								// double mis_weight = this_pdf / (this_pdf + other_pdf);
-								double mis_weight = this_pdf * this_pdf / (this_pdf * this_pdf + other_pdf * other_pdf);
-								Lo += contribution * mis_weight;
-#else
-								Lo += contribution;
-#endif
-							}
-						}
+				auto nee = [&]() {
+					if (i == (kDepth - 1)) {
+						return;
 					}
-				}
+					if (m->can_direct_sampling() == false) {
+						return;
+					}
+					glm::dvec3 p = m->p;
+					
+					static thread_local std::vector<double> importance_storage;
+					LightSelector selector(p, scene.sampler_begin(), scene.sampler_end(), importance_storage);
+					if (selector.can_sample() == false) {
+						return;
+					}
+
+					double p_choice = 0.0;
+					auto sampler = selector.choice(random, &p_choice);
+					glm::dvec3 q;
+					glm::dvec3 n;
+					glm::dvec3 Le;
+					double pdf_area = 0.0;
+					sampler->sample(random, p, &q, &n, &Le, &pdf_area);
+
+					double pqDistance2 = glm::distance2(p, q);
+					glm::dvec3 wi = (q - p) / std::sqrt(pqDistance2);
+
+					double cosThetaP = glm::dot(m->Ng, wi);
+
+					// 裏側に光源があるので早期棄却
+					if (cosThetaP < 0.0) {
+						return;
+					}
+
+					// これはcan_sampleにおいてすでに裏面でないことが保証されている
+					double cosThetaQ = glm::dot(n, -wi);
+
+					glm::dvec3 bxdf = m->bxdf(wo, wi);
+
+					double g = GTerm(cosThetaP, cosThetaQ, pqDistance2);
+
+					glm::dvec3 contribution = T * bxdf * Le * g / pdf_area / p_choice;
+
+					if (has_value(contribution, kValueEPS) == false) {
+						return;
+					}
+					if (scene.occluded(p + m->Ng * kSceneEPS, q + n * kSceneEPS)) {
+						return;
+					}
+#if ENABLE_NEE_MIS
+					double this_pdf = pdf_area * p_choice;
+					double other_pdf = m->pdf(wo, wi) * glm::dot(-n, wi) / pqDistance2;
+					// double mis_weight = this_pdf / (this_pdf + other_pdf);
+					double mis_weight = this_pdf * this_pdf / (this_pdf * this_pdf + other_pdf * other_pdf);
+					Lo += contribution * mis_weight;
+#else
+					Lo += contribution;
+#endif
+				};
+				nee();
 #endif
 				glm::dvec3 wi = m->sample(random, wo);
 				glm::dvec3 bxdf = m->bxdf(wo, wi);
@@ -164,9 +166,12 @@ namespace rt {
 					if (i != 0) {
 						if (auto sampler = m->direct_sampler()) {
 							if (sampler->can_sample(previous_m->p) && previous_m->can_direct_sampling()) {
+								static thread_local std::vector<double> importance_storage;
+								LightSelector selector(previous_m->p, scene.sampler_begin(), scene.sampler_end(), importance_storage);
+
 								double r = (double)tmin;
 								double this_pdf = previous_pdf * glm::dot(m->Ng, wo) / (r * r);
-								double other_pdf = sampler->pdf_area(previous_m->p, m->p);
+								double other_pdf = sampler->pdf_area(previous_m->p, m->p) * selector.p(sampler);
 								// double mis_weight = this_pdf * this_pdf / (this_pdf + other_pdf);
 								double mis_weight = this_pdf * this_pdf / (this_pdf * this_pdf + other_pdf * other_pdf);
 								mis = true;
