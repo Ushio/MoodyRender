@@ -183,7 +183,7 @@ void ofApp::draw() {
 		}
 		uint32_t n = renderer->stepCount();
 
-		if (64 <= n && isPowerOfTwo(n)) {
+		if (32 <= n && isPowerOfTwo(n)) {
 			_image.setFromPixels(toOf(renderer->_image));
 			char name[64];
 			sprintf(name, "%dspp.png", n);
