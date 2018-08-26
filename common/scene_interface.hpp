@@ -17,7 +17,7 @@ namespace rt {
 	class SceneInterface {
 	public:
 		SceneInterface(std::shared_ptr<rt::Scene> scene) :_scene(scene) {
-			_embreeDevice = rtcNewDevice(nullptr);
+			_embreeDevice = rtcNewDevice("set_affinity=1");
 			rtcSetDeviceErrorFunction(_embreeDevice, EmbreeErorrHandler, nullptr);
 			_embreeScene = rtcNewScene(_embreeDevice);
 			rtcSetSceneBuildQuality(_embreeScene, RTC_BUILD_QUALITY_HIGH);
