@@ -9,7 +9,8 @@
 
 #include "ofMain.h"
 
-static const double kRenderTime = 123.0;
+static const double kRenderTime = 60;
+// static const double kRenderTime = 123.0;
 // static const double kRenderTime = 60 * 60;
 
 inline ofPixels toOf(const rt::Image &image) {
@@ -37,13 +38,14 @@ inline void render(rt::Stopwatch *main_sw, std::function<void(int)> step, std::f
 
 	rt::Stopwatch save_interval_time;
 
-	rt::OnlineMean<double> step_duration;
+	double step_duration = 0.0;
 	for (int i = 0; ; ++i) {
 		rt::Stopwatch sw;
 		step(i);
-		step_duration.addSample(sw.elapsed());
+		// step_duration = sw.elapsed();
+		step_duration = glm::mix(step_duration, sw.elapsed(), 0.5);
 
-		if (duration - safety_duration < main_sw->elapsed() + step_duration.mean()) {
+		if (duration - safety_duration < main_sw->elapsed() + step_duration) {
 			save(i + 1);
 			break;
 		}

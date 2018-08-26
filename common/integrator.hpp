@@ -3,8 +3,10 @@
 #include <atomic>
 #include <tbb/tbb.h>
 #include "scene_interface.hpp"
+#include "online.hpp"
 
 #define DEBUG_MODE 0
+#define ENABLE_ADAPTIVE_SAMPLING 0
 
 #define ENABLE_NEE 1
 #define ENABLE_NEE_MIS 1
@@ -30,11 +32,30 @@ namespace rt {
 			int index = y * _w + x;
 			_pixels[index].color += c;
 			_pixels[index].sample++;
+			if (_pixels[index].sample & 0x1) {
+				_pixels[index].color_half += c;
+			}
 		}
 
 		struct Pixel {
 			int sample = 0;
 			glm::dvec3 color;
+			glm::dvec3 color_half;
+
+			double ep() const {
+				if (sample & 0x1) {
+					abort();
+				}
+				glm::dvec3 I = color / double(sample);
+				glm::dvec3 A = 2.0 * color_half / double(sample);
+				glm::dvec3 d = glm::abs(I - A);
+				double denom = std::sqrt(I.x + I.y + I.z);
+				if (denom < 1.0e-12) {
+					return 0.0;
+				}
+				double e = (d.x + d.y + d.z) / denom;
+				return e;
+			}
 		};
 		const Pixel *pixel(int x, int y) const {
 			return _pixels.data() + y * _w + x;
@@ -215,6 +236,66 @@ namespace rt {
 		return Lo;
 	}
 
+	// x0 <= u < x1
+	// y0 <= v < y1
+	class Region {
+	public:
+		int x0 = 0;
+		int y0 = 0;
+		int x1 = 0;
+		int y1 = 0;
+
+		int area() const {
+			return (x1 - x0) * (y1 - y0);
+		}
+		std::tuple<Region, Region> divide() const {
+			int w = x1 - x0;
+			int h = y1 - y0;
+			if (w < h) {
+				int cy = y0 + h / 2;
+				Region L;
+				L.x0 = x0;
+				L.y0 = y0;
+				L.x1 = x1;
+				L.y1 = cy;
+
+				Region R;
+				R.x0 = x0;
+				R.y0 = cy;
+				R.x1 = x1;
+				R.y1 = y1;
+				return std::tuple<Region, Region>(L, R);
+			}
+			else {
+				int cx = x0 + w / 2;
+				Region L;
+				L.x0 = x0;
+				L.y0 = y0;
+				L.x1 = cx;
+				L.y1 = y1;
+
+				Region R;
+				R.x0 = cx;
+				R.y0 = y0;
+				R.x1 = x1;
+				R.y1 = y1;
+				return std::tuple<Region, Region>(L, R);
+			}
+			return std::tuple<Region, Region>();
+		}
+		void divide(int min_area, std::vector<Region> &regions) const {
+			rt::Region A, B;
+			std::tie(A, B) = divide();
+			if (min_area < A.area() && min_area < B.area()) {
+				A.divide(min_area, regions);
+				B.divide(min_area, regions);
+			}
+			else {
+				regions.push_back(*this);
+			}
+		}
+	};
+
 	class PTRenderer {
 	public:
 		PTRenderer(std::shared_ptr<rt::Scene> scene)
@@ -225,10 +306,22 @@ namespace rt {
 			_badSampleInfCount = 0;
 			_badSampleNegativeCount = 0;
 			_badSampleFireflyCount = 0;
+
+			std::vector<rt::Region> regions;
+			rt::Region whole;
+			whole.x0 = 0;
+			whole.y0 = 0;
+			whole.x1 = _image.width();
+			whole.y1 = _image.height();
+			whole.divide(32 * 32, regions);
+
+			for (int i = 0; i < regions.size(); ++i) {
+				Block b;
+				b.region = regions[i];
+				_blocks.push_back(b);
+			}
 		}
 		void step() {
-			_steps++;
-
 #if DEBUG_MODE
 			int focusX = 200;
 			int focusY = 200;
@@ -249,6 +342,73 @@ namespace rt {
 				}
 			}
 #else
+			
+#if ENABLE_ADAPTIVE_SAMPLING
+			auto step_block = [&](const Block &block){
+				const Region &region = block.region;
+				for (int y = region.y0; y < region.y1; ++y) {
+					for (int x = region.x0; x < region.x1; ++x) {
+						PeseudoRandom *random = _image.random(x, y);
+						glm::dvec3 o;
+						glm::dvec3 d;
+						_scene->camera.sampleRay(random, x, y, &o, &d);
+
+						auto r = radiance(*_sceneInterface, o, d, random);
+
+						check_sample(r);
+
+						_image.add(x, y, r);
+					}
+				}
+			};
+			auto update_metric = [&](Block &block) {
+				const Region &region = block.region;
+				rt::OnlineMean<double> ed;
+				for (int y = region.y0; y < region.y1; ++y) {
+					for (int x = region.x0; x < region.x1; ++x) {
+						int index = y * _image.width() + x;
+						const auto &px = *_image.pixel(x, y);
+						ed.addSample(px.ep());
+					}
+				}
+				block.metric = ed.mean();
+			};
+
+			const int kAdaptiveBegin = 32;
+			const int kAdaptiveFreq = 8;
+			const int kActiveBlocks = _blocks.size() / 3;
+
+			if (_steps < kAdaptiveBegin) {
+				tbb::parallel_for(tbb::blocked_range<int>(0, _blocks.size()), [&](const tbb::blocked_range<int> &range) {
+					for (int i = range.begin(); i < range.end(); ++i) {
+						step_block(_blocks[i]);
+						_blocks[i].sample++;
+					}
+				});
+			}
+			else {
+				// kAdaptiveBegin <= _steps
+				if ((_steps - kAdaptiveBegin) % kAdaptiveFreq == 0) {
+					int metric_blocks = _steps == kAdaptiveBegin ? _blocks.size() : kActiveBlocks;
+					tbb::parallel_for(tbb::blocked_range<int>(0, metric_blocks), [&](const tbb::blocked_range<int> &range) {
+						for (int i = range.begin(); i < range.end(); ++i) {
+							update_metric(_blocks[i]);
+						}
+					});
+					std::sort(_blocks.begin(), _blocks.end(), [](const Block &a, const Block &b) {
+						return a.metric > b.metric;
+					});
+				}
+				// kActiveBlocks
+				// _blocks.size()
+				tbb::parallel_for(tbb::blocked_range<int>(0, kActiveBlocks), [&](const tbb::blocked_range<int> &range) {
+					for (int i = range.begin(); i < range.end(); ++i) {
+						step_block(_blocks[i]);
+						_blocks[i].sample++;
+					}
+				});
+			}
+#else
 			tbb::parallel_for(tbb::blocked_range<int>(0, _scene->camera.imageHeight()), [&](const tbb::blocked_range<int> &range) {
 				for (int y = range.begin(); y < range.end(); ++y) {
 					for (int x = 0; x < _scene->camera.imageWidth(); ++x) {
@@ -259,29 +419,16 @@ namespace rt {
 
 						auto r = radiance(*_sceneInterface, o, d, random);
 
-						for (int i = 0; i < r.length(); ++i) {
-							if (glm::isnan(r[i])) {
-								_badSampleNanCount++;
-								r[i] = 0.0;
-							}
-							else if (glm::isfinite(r[i]) == false) {
-								_badSampleInfCount++;
-								r[i] = 0.0;
-							}
-							else if (r[i] < 0.0) {
-								_badSampleNegativeCount++;
-								r[i] = 0.0;
-							}
-							if (10000.0 < r[i]) {
-								_badSampleFireflyCount++;
-								r[i] = 0.0;
-							}
-						}
+						check_sample(r);
+
 						_image.add(x, y, r);
 					}
 				}
 			});
 #endif
+
+#endif
+			_steps++;
 		}
 		int stepCount() const {
 			return _steps;
@@ -289,6 +436,27 @@ namespace rt {
 
 		const rt::SceneInterface &sceneInterface() const {
 			return *_sceneInterface;
+		}
+
+		void check_sample(glm::dvec3 &r) {
+			for (int i = 0; i < r.length(); ++i) {
+				if (glm::isnan(r[i])) {
+					_badSampleNanCount++;
+					r[i] = 0.0;
+				}
+				else if (glm::isfinite(r[i]) == false) {
+					_badSampleInfCount++;
+					r[i] = 0.0;
+				}
+				else if (r[i] < 0.0) {
+					_badSampleNegativeCount++;
+					r[i] = 0.0;
+				}
+				if (10000.0 < r[i]) {
+					_badSampleFireflyCount++;
+					r[i] = 0.0;
+				}
+			}
 		}
 
 		int badSampleNanCount() const {
@@ -312,5 +480,12 @@ namespace rt {
 		std::atomic<int> _badSampleInfCount;
 		std::atomic<int> _badSampleNegativeCount;
 		std::atomic<int> _badSampleFireflyCount;
+
+		struct Block {
+			Region region;
+			double metric = 0.0;
+			int sample = 0;
+		};
+		std::vector<Block> _blocks;
 	};
 }

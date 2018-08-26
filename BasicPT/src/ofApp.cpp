@@ -8,6 +8,7 @@
 
 #include "ofApp.h"
 #include "ofxImGuiLite.hpp"
+#include "online.hpp"
 
 inline ofPixels toOf(const rt::Image &image) {
 	ofPixels pixels;
@@ -199,6 +200,146 @@ void ofApp::draw() {
 	ofDisableDepthTest();
 	ofSetColor(255);
 
+
+	// metric
+	//static ofImage metricImage;
+	//if ((renderer->stepCount() & 0x1) == 0) {
+	//	const rt::Image &image = renderer->_image;
+	//	rt::OnlineMean<double> ep_avg;
+	//	for (int y = 0; y < image.height(); ++y) {
+	//		for (int x = 0; x < image.width(); ++x) {
+	//			int index = y * image.width() + x;
+	//			const auto &px = *image.pixel(x, y);
+	//			ep_avg.addSample(px.ep());
+	//		}
+	//	}
+	//	int allPixels = image.width() * image.height();
+	//	double ep_all = ep_avg.mean() * std::sqrt(allPixels / allPixels);
+	//	
+	//	int region_size_x = image.width() / 2;
+	//	rt::OnlineMean<double> epL_avg;
+	//	rt::OnlineMean<double> epR_avg;
+	//	for (int y = 0; y < image.height(); ++y) {
+	//		for (int x = 0; x < image.width(); ++x) {
+	//			int index = y * image.width() + x;
+	//			const auto &px = *image.pixel(x, y);
+	//			
+	//			if (x < region_size_x) {
+	//				epL_avg.addSample(px.ep());
+	//			}
+	//			else {
+	//				epR_avg.addSample(px.ep());
+	//			}
+	//		}
+	//	}
+	//	double ep_L = epL_avg.mean() * std::sqrt((double)region_size_x * image.height() / allPixels);
+	//	double ep_R = epR_avg.mean() * std::sqrt((double)region_size_x * image.height() / allPixels);
+	//	printf("%.5f, {%.5f, %.5f}\n", ep_all, ep_L, ep_R);
+	//}
+
+	if ((renderer->stepCount() & 0x1) == 0) {
+		const rt::Image &image = renderer->_image;
+		int allPixels = image.width() * image.height();
+
+		//static std::vector<rt::Region> regions;
+		//if (regions.empty()) {
+		//	metricImage.allocate(image.width(), image.height(), OF_IMAGE_COLOR);
+
+		//	rt::Region whole;
+		//	whole.x0 = 0;
+		//	whole.y0 = 0;
+		//	whole.x1 = image.width();
+		//	whole.y1 = image.height();
+		//	whole.divide(32 * 32, regions);
+		//}
+		//std::vector<rt::Region> new_regions;
+		//for (int i = 0; i < regions.size(); ++i)
+		//{
+		//	auto region = regions[i];
+		//	rt::OnlineMean<double> ep_avg;
+		//	for (int y = region.y0; y < region.y1; ++y) {
+		//		for (int x = region.x0; x < region.x1; ++x) {
+		//			int index = y * image.width() + x;
+		//			const auto &px = *image.pixel(x, y);
+		//			ep_avg.addSample(px.ep());
+		//		}
+		//	}
+		//	double ep = ep_avg.mean() *std::sqrt((double)region.area() / allPixels);
+		//	if (ep < 0.03 && 64 < region.area()) {
+		//		rt::Region A, B;
+		//		std::tie(A, B) = region.divide();
+		//		new_regions.push_back(A);
+		//		new_regions.push_back(B);
+		//	}
+		//	else {
+		//		new_regions.push_back(region);
+		//	}
+		//}
+		//regions = new_regions;
+
+		//uint8_t *p = metricImage.getPixels().getPixels();
+		//rt::XoroshiroPlus128 random;
+		//for (int i = 0; i < regions.size(); ++i)
+		//{
+		//	auto region = regions[i];
+		//	uint8_t color[3] = {
+		//		(uint8_t)random.uniform(0.0, 256.0),
+		//		(uint8_t)random.uniform(0.0, 256.0),
+		//		(uint8_t)random.uniform(0.0, 256.0),
+		//	};
+		//	for (int y = region.y0; y < region.y1; ++y) {
+		//		for (int x = region.x0; x < region.x1; ++x) {
+		//			int index = y * image.width() + x;
+		//			p[index * 3 + 0] = color[0];
+		//			p[index * 3 + 1] = color[1];
+		//			p[index * 3 + 2] = color[2];
+		//		}
+		//	}
+		//}
+	}
+
+	const rt::Image &image = renderer->_image;
+	static ofImage metricImage;
+	if (metricImage.isAllocated() == false) {
+		metricImage.allocate(image.width(), image.height(), OF_IMAGE_COLOR);
+	}
+	uint8_t *p = metricImage.getPixels().getPixels();
+	rt::XoroshiroPlus128 random;
+
+	int maxSample = 0;
+	for (int i = 0; i < renderer->_blocks.size(); ++i)
+	{
+		maxSample = std::max(maxSample, renderer->_blocks[i].sample);
+	}
+
+	for (int i = 0; i < renderer->_blocks.size(); ++i)
+	{
+		auto region = renderer->_blocks[i].region;
+		// double brightness = (double)i / renderer->_blocks.size();
+		double brightness = (double)renderer->_blocks[i].sample / (maxSample + 1);
+		uint8_t color[3] = {
+			(uint8_t)(brightness * 256.0),
+			(uint8_t)(brightness * 256.0),
+			(uint8_t)(brightness * 256.0),
+		};
+		for (int y = region.y0; y < region.y1; ++y) {
+			for (int x = region.x0; x < region.x1; ++x) {
+				int index = y * image.width() + x;
+				p[index * 3 + 0] = color[0];
+				p[index * 3 + 1] = color[1];
+				p[index * 3 + 2] = color[2];
+			}
+		}
+	}
+	metricImage.update();
+	if (metricImage.isAllocated()) {
+		metricImage.draw(0, 0);
+	}
+
+	if (_showGUI == false) {
+		return;
+	}
+
 	ofxImGuiLite::ScopedImGui imgui;
 
 	// camera control                                          for control clicked problem
@@ -250,6 +391,10 @@ void ofApp::keyPressed(int key) {
 
 	if (key == 'r') {
 		loadScene();
+	}
+
+	if (key == ' ') {
+		_showGUI = !_showGUI;
 	}
 }
 

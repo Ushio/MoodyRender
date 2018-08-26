@@ -27,4 +27,5 @@ public:
 	ofImage _image;
 	bool _render = true;
 	bool _showWireframe = false;
+	bool _showGUI = true;
 };
