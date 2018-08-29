@@ -84,7 +84,7 @@ int main( ){
 		ofPixels image = toOf(renderer->_image);
 
 		char name[128];
-		sprintf(name, "../../rendered_images/image_%d_spp.jpg", spp);
+		sprintf(name, "../../rendered_images/image_%d_spp.png", spp);
 		ofSaveImage(image, name);
 		printf("save as %s\n", name);
 	}, kRenderTime, 15.0);
