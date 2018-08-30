@@ -400,11 +400,14 @@ namespace rt {
 
 	inline Geometry geometryMaterialBinding(const AlembicGeometry &abcGeom) {
 		Geometry geom;
+		geom.points.reserve(abcGeom.points.size());
 		for (int pointID = 0; pointID < abcGeom.points.size(); ++pointID) {
 			Geometry::Point point;
 			point.P = abcGeom.points[pointID];
 			geom.points.push_back(point);
 		}
+
+		geom.primitives.reserve(abcGeom.primitives.size());
 		for (int primID = 0; primID < abcGeom.primitives.size(); ++primID) {
 			Geometry::Primitive prim;
 			prim.indices = abcGeom.primitives[primID];
