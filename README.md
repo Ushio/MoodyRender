@@ -1,6 +1,9 @@
 ## Moody Render for rtcamp6
 ![17_usho](17_usho.png)
 
+## スライド
+https://speakerdeck.com/ushiostarfish/moody-render
+
 ## dependencies
 openframeworks 0.10.0
 
