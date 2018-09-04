@@ -8,7 +8,14 @@ https://speakerdeck.com/ushiostarfish/moody-render
 BasicPTでメイン開発しつつ、Renderで提出します。
 ほかは多目的な検証やらなんやらです。
 
-## dependencies
+## シーン
+houdiniのファイルからレンダリング可能な、シーン全体のalembicを書き出すためには、Indie以上が必要です。
+そのため、最終シーンはこちらからDL可能にしました。<br>
+https://s3-ap-northeast-1.amazonaws.com/ushiobucket1/rtcamp6/cornelbox.zip <br>
+これをdata以下のフォルダに配置します
+
+
+## 依存
 openframeworks 0.10.0
 
 embree 3.1.0
