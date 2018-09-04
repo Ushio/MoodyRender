@@ -163,6 +163,8 @@ namespace rt {
 #if ENABLE_NEE_MIS
 				if (has_value(contribution, kValueEPS)) {
 					bool mis = false;
+					// i == 0、つまり最初に光源（ではないかもしれないが）に衝突したときは、１つ前の衝突にて現在の面がNEEされることは無い。
+					// したがってmisは発生しない
 					if (i != 0) {
 						if (auto sampler = m->direct_sampler()) {
 							if (sampler->can_sample(previous_m->p) && previous_m->can_direct_sampling()) {
