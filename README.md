@@ -4,6 +4,10 @@
 ## スライド
 https://speakerdeck.com/ushiostarfish/moody-render
 
+## 構成
+BasicPTでメイン開発しつつ、Renderで提出します。
+ほかは多目的な検証やらなんやらです。
+
 ## dependencies
 openframeworks 0.10.0
 
@@ -16,3 +20,4 @@ because 3.2 have libmmd.dll dependancy reported at https://github.com/embree/emb
 vcpkg
 alembic:x64-windows
 tbb:x64-windows
+
