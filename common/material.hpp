@@ -106,13 +106,16 @@ namespace rt {
 	struct AreaSample {
 		
 	};
+	struct SphericalTriangleSample {
+
+	};
 	struct SphericalRectangleSample {
 		int triangleIndex = 0;
 		glm::dvec3 s;
 		glm::dvec3 ex;
 		glm::dvec3 ey;
 	};
-	typedef strict_variant::variant<NoSample, AreaSample, SphericalRectangleSample> SamplingStrategy;
+	typedef strict_variant::variant<NoSample, AreaSample, SphericalRectangleSample, SphericalTriangleSample> SamplingStrategy;
 
 	// 現行ではLambertianMaterial だけがdoubleSlideを許可
 	class LambertianMaterial : public IMaterial {

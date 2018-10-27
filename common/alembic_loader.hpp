@@ -452,6 +452,9 @@ namespace rt {
 					if (samplingStrategy == "AreaSample") {
 						m.samplingStrategy = AreaSample();
 					}
+					else if(samplingStrategy == "SphericalTriangleSample") {
+						m.samplingStrategy = SphericalTriangleSample();
+					}
 					else if (samplingStrategy == "SphericalRectangleSample") {
 						bool succeeded = true;
 						SphericalRectangleSample sphericalRectangleSample;

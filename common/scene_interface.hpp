@@ -69,6 +69,14 @@ namespace rt {
 							lambertian->sampler = sampler;
 							_directSamplers.emplace_back(sampler);
 						}
+						else if (auto sample = lambertian->samplingStrategy.get<SphericalTriangleSample>()) {
+							auto a = g.points[p.indices[0]].P;
+							auto b = g.points[p.indices[1]].P;
+							auto c = g.points[p.indices[2]].P;
+							SphericalTriangleDirectSampler *sampler = new SphericalTriangleDirectSampler(a, b, c, lambertian->backEmission, lambertian->Le);
+							lambertian->sampler = sampler;
+							_directSamplers.emplace_back(sampler);
+						}
 						else if (auto sample = lambertian->samplingStrategy.get<SphericalRectangleSample>())
 						{
 							// あまり綺麗ではないが、triangleIndex 0, 1, 0, 1...となる決まりにする。

@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "geometry.hpp"
 #include "peseudo_random.hpp"
+#include "spherical_triangle_sampler.hpp"
 
 namespace rt {
 	struct Rectangle {
@@ -329,6 +330,7 @@ namespace rt {
 		std::vector<IDirectSampler *>::const_iterator _end;
 	};
 	using LightSelector = LightSelectorHeuristic;
+	// using LightSelector = LightSelectorUniform;
 
 	class TriangleAreaSampler : public IDirectSampler {
 	public:
@@ -479,6 +481,92 @@ namespace rt {
 		Rectangle _q;
 		glm::dvec3 _center;
 
+		double _Lavg_mul_area = 0.0;
+	};
+
+
+	class SphericalTriangleDirectSampler : public IDirectSampler {
+	public:
+		SphericalTriangleDirectSampler(glm::dvec3 a, glm::dvec3 b, glm::dvec3 c, bool doubleSided, glm::dvec3 Le)
+			:_a(a)
+			, _b(b)
+			, _c(c)
+			, _doubleSided(doubleSided)
+			, _Le(Le) {
+			_Lavg = (_Le.x + _Le.y + _Le.z) / 3.0;
+			_n = triangleNormal(_a, _b, _c);
+			_center = (_a + _b + _c) / 3.0;
+			double area = triangleArea(_a, _b, _c);
+			_Lavg_mul_area = _Lavg * area;
+		}
+
+		virtual double pdf_area(glm::dvec3 o, glm::dvec3 p) const override {
+			if (can_sample(o) == false) {
+				return 0.0;
+			}
+			
+			glm::dvec3 d = p - o;
+			bool backfacing = 0.0 < glm::dot(d, _n);
+			glm::dvec3 n = backfacing ? -_n : _n;
+
+			SphericalTriangleSampler sampler(_a, _b, _c, _n, o);
+			double dLength2 = glm::length2(d);
+			double cosTheta = glm::dot(-n, d / std::sqrt(dLength2));
+			double pw = 1.0 / sampler.solidAngle();
+			return pw * cosTheta / dLength2;
+		}
+		virtual bool can_sample(glm::dvec3 o) const override {
+			// サンプル面からの符号付き距離
+			// sd > 0.0 なら表
+			double sd = glm::dot(o - _a, _n);
+			const double kEps = 1.0e-6;
+
+			if (_doubleSided) {
+				// 面に対して水平でない : |sd| > kEps
+				return std::abs(sd) > kEps;
+			}
+			else {
+				// 面に対して水平でない : |sd| > kEps
+				// 表                   : sd > 0
+				// したがって、
+				// sd > kEps
+				return sd > kEps;
+			}
+		}
+
+		virtual void sample(PeseudoRandom *random, glm::dvec3 o, glm::dvec3 *p, glm::dvec3 *n, glm::dvec3 *Le, double *pdf_area) const override {
+			SphericalTriangleSampler sampler(_a, _b, _c, _n, o);
+
+			// dは単位ベクトル
+			glm::dvec3 d;
+			*p = sampler.sample(random->uniform(), random->uniform(), &d);
+
+			bool backfacing = 0.0 < glm::dot(d, _n);
+
+			if (_doubleSided) {
+				*n = backfacing ? -_n : _n;
+				*Le = _Le;
+			}
+			else {
+				*n = _n;
+				*Le = backfacing ? glm::dvec3(0.0) : _Le;
+			}
+
+			double dLength2 = glm::distance2(*p, o);
+			double cosTheta = glm::dot(-*n, d);
+			double pw = 1.0 / sampler.solidAngle();
+			*pdf_area = pw * cosTheta / dLength2;
+		}
+
+		virtual glm::dvec3 center() const override { return _center; }
+		virtual double Lavg_mul_area() const override { return _Lavg_mul_area; }
+	private:
+		glm::dvec3 _Le;
+		double _Lavg = 0;
+		glm::dvec3 _a, _b, _c;
+		glm::dvec3 _n;
+		glm::dvec3 _center;
+		bool _doubleSided = false;
 		double _Lavg_mul_area = 0.0;
 	};
 }
