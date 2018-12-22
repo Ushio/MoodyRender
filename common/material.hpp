@@ -763,7 +763,7 @@ namespace rt {
 			auto params_0 = f_velvet();
 			auto params_1 = f_velvet();
 
-			// Dir1
+			//// Dir1
 			static std::vector<double> tangent_offsets_u = {
 				-90,
 				-50,
@@ -775,6 +775,19 @@ namespace rt {
 				55,
 				90
 			};
+			//// Dir1
+			//static std::vector<double> tangent_offsets_u = {
+			//	-90,
+			//	-55,
+			//	-50,
+			//};
+			//// Dir2
+			//static std::vector<double> tangent_offsets_v = {
+			//	-90,
+			//	-75,
+			//	75,
+			//	90
+			//};
 #endif
 
 			double cosThetaI;

@@ -11,6 +11,7 @@ namespace rt {
 //#define RT_ASSERT(expect_true) if((expect_true) == 0) { __debugbreak(); }
 //#endif
 #define RT_ASSERT(expect_true) ;
+#define RT_ASSERT_(expect_true) if((expect_true) == 0) { __debugbreak(); }
 
 	inline double normalized_gaussian(double beta, double theta) {
 		return std::exp(-theta * theta / (2.0 * beta * beta)) / (std::sqrt(glm::two_pi<double>() * beta * beta));
@@ -161,6 +162,29 @@ namespace rt {
 		return bsdf(p.theta_d, p.theta_h, p.phi_d, p.cosThetaI, p.cosThetaO, params);
 	}
 
+	inline double u_gaussian(double x) {
+		static const double sd = glm::radians(20.0);
+		static const double sqr_sd_2 = sd * sd * 2.0;
+		return std::exp(-x * sqr_sd_2);
+	}
+
+	inline double M(double cosPhiI, double cosPhiO, double phi_d) {
+		double m_i = std::max(cosPhiI, 0.0);
+		double m_o = std::max(cosPhiO, 0.0);
+		double u = u_gaussian(phi_d);
+		double corrated = std::min(m_i, m_o);
+		double uncorrated = m_i * m_o;
+		return glm::mix(uncorrated, corrated, u);
+	}
+	inline double P(double cosPsiI, double cosPsiO, double psi_d) {
+		double m_i = std::max(cosPsiI, 0.0);
+		double m_o = std::max(cosPsiO, 0.0);
+		double u = u_gaussian(psi_d);
+		double corrated = std::min(m_i, m_o);
+		double uncorrated = m_i * m_o;
+		return glm::mix(uncorrated, corrated, u);
+	}
+
 	inline glm::dvec3 brdf_x_cosTheta(glm::dvec3 u, glm::dvec3 v, glm::dvec3 n, glm::dvec3 wi, glm::dvec3 wo, double alpha_0, double alpha_1, const std::vector<double> &tangent_offsets_u, const std::vector<double> &tangent_offsets_v, ThreadParameters params_0, ThreadParameters params_1, double *cosThetaI) {
 		RT_ASSERT(0.0 <= gamma_s);
 		RT_ASSERT(0.0 <= gamma_v);
@@ -169,11 +193,20 @@ namespace rt {
 		RT_ASSERT(0.0 <= alpha_0 && alpha_0 <= 1.0);
 		RT_ASSERT(0.0 <= alpha_1 && alpha_1 <= 1.0);
 
+		//double ppp = glm::dot(u, v);
+		//double pppp = glm::dot(v, n);
+		//double ppppp = glm::dot(n, u);
+		//RT_ASSERT_(glm::abs(glm::dot(u, v)) < 1.0e-3);
+		//RT_ASSERT_(glm::abs(glm::dot(v, n)) < 1.0e-3);
+		//RT_ASSERT_(glm::abs(glm::dot(n, v)) < 1.0e-3);
+
 		int Nu = tangent_offsets_u.size();
 		int Nv = tangent_offsets_v.size();
 
 		glm::dvec3 uValue;
 		glm::dvec3 vValue;
+
+		double Q = 0.0;
 
 		for (double tangent_offset : tangent_offsets_u) {
 			glm::dvec3 v_shade = v;
@@ -187,7 +220,17 @@ namespace rt {
 				continue;
 			}
 			glm::dvec3 fr = bsdf(p.theta_d, p.theta_h, p.phi_d, p.cosThetaI, p.cosThetaO, params_0);
-			uValue += fr * p.cosThetaI;
+			// uValue += fr * p.cosThetaI;
+
+			// shadowing masking
+			// double m = M(p.cosPhiI, p.cosPhiO, p.phi_d);
+			// uValue += m * fr * p.cosThetaI;
+
+			// shadowing masking + reweighting
+			double m = M(p.cosPhiI, p.cosPhiO, p.phi_d);
+			double P = M(p.cosPsiI, p.cosPsiO, p.psi_d);
+			uValue += P * m * fr * p.cosThetaI;
+			Q += alpha_0 * P / Nu;
 		}
 		uValue /= Nu;
 
@@ -200,12 +243,27 @@ namespace rt {
 				continue;
 			}
 			glm::dvec3 fr = bsdf(p.theta_d, p.theta_h, p.phi_d, p.cosThetaI, p.cosThetaO, params_1);
-			vValue += fr * p.cosThetaI;
+			// vValue += fr * p.cosThetaI;
+
+			// double m = M(p.cosPhiI, p.cosPhiO, p.phi_d);
+			// vValue += m * fr * p.cosThetaI;
+
+			// shadowing masking + reweighting
+			double m = M(p.cosPhiI, p.cosPhiO, p.phi_d);
+			double P = M(p.cosPsiI, p.cosPsiO, p.psi_d);
+			vValue += P * m * fr * p.cosThetaI;
+			Q += alpha_1 * P / Nv;
 		}
-		uValue /= Nv;
+		vValue /= Nv;
 
 		*cosThetaI = glm::abs(glm::dot(n, wi));
-		return uValue * alpha_0 + vValue * alpha_1;
+		glm::dvec3 fr_cosTheta = uValue * alpha_0 + vValue * alpha_1;
+
+		if (0.0 < Q) {
+			fr_cosTheta /= Q;
+		}
+
+		return fr_cosTheta;
 	}
 
 	inline ThreadParameters a_both() {
