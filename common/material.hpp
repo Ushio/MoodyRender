@@ -10,6 +10,8 @@
 #include "peseudo_random.hpp"
 #include "microfacet.hpp"
 #include "coordinate.hpp"
+#include "microcylindercloth.hpp"
+
 #if ENABLE_HEITZ
 #include "MicrosurfaceScattering.h"
 #endif
@@ -152,6 +154,12 @@ namespace rt {
 		virtual double pdf(const glm::dvec3 &wo, const glm::dvec3 &sampled_wi) const override {
 			return LambertianSampler::pdf(sampled_wi, Ng);
 		}
+		//glm::dvec3 sample(PeseudoRandom *random, const glm::dvec3 &wo) const override {
+		//	return UniformHemisphereSampler::sample(random, Ng);
+		//}
+		//double pdf(const glm::dvec3 &wo, const glm::dvec3 &sampled_wi) const override {
+		//	return UniformHemisphereSampler::pdf(sampled_wi, Ng);
+		//}
 	};
 
 	class SpecularMaterial : public IMaterial {
@@ -635,6 +643,159 @@ namespace rt {
 			return pdf_omega;
 		}
 	};
+	class MicrocylinderClothMaterial : public IMaterial {
+	public:
+		glm::dvec3 tangentu;
+		glm::dvec3 tangentv;
+
+		glm::dvec3 bxdf(const glm::dvec3 &wo, const glm::dvec3 &wi) const override {
+			if (glm::dot(Ng, wi) < 0.0 || glm::dot(Ng, wo) < 0.0) {
+				return glm::dvec3(0.0);
+			}
+
+			//return glm::dvec3(1.0) * glm::one_over_pi<double>();
+			//return tangentv / glm::pi<double>();
+			//return glm::dvec3(1.0 / glm::pi<double>());
+		
+#define A_LINEN_PLAIN 0
+#define B_SILK_CREPE_DE_CHINE 0
+#define C_POLYESTER_SATIN_CHARMEUSE 0
+#define D_POLYESTER_SATIN_CHARMEUSE_BACK 0
+#define E_SILK_SHOT 1
+#define F_VELVET 0
+
+#if A_LINEN_PLAIN
+			// a
+			double alpha_0 = 0.33;
+			double alpha_1 = 0.33;
+			auto params_0 = a_both();
+			auto params_1 = a_both();
+			static std::vector<double> tangent_offsets_u = { -25, 25 };
+			static std::vector<double> tangent_offsets_v = { -25, 25 };
+#endif
+
+#if B_SILK_CREPE_DE_CHINE
+			// b Silk Crepe de Chine 
+			double alpha_0 = 0.75;
+			double alpha_1 = 0.25;
+			auto params_0 = b_flat();
+			auto params_1 = b_twisted();
+
+			// Flat
+			static std::vector<double> tangent_offsets_u = {
+				-35,
+				-35,
+				35,
+				35
+			};
+			// Twisted
+			static std::vector<double> tangent_offsets_v = { 0.0 };
+#endif
+
+#if C_POLYESTER_SATIN_CHARMEUSE
+			// c Polyester Satin Charmeuse
+
+			double alpha_0 = 0.9;
+			double alpha_1 = 0.1;
+			auto params_0 = c_flat();
+			auto params_1 = c_twisted();
+
+			// Flat, 
+			static std::vector<double> tangent_offsets_u = {
+				-32,
+				-32,
+				-18,
+				0,
+				0,
+				18,
+				32,
+				32,
+			};
+
+			// Twisted
+			static std::vector<double> tangent_offsets_v = { 0.0 };
+#endif
+
+#if D_POLYESTER_SATIN_CHARMEUSE_BACK
+			// Polyester Satin Charmeuse backside
+			double alpha_0 = 0.67;
+			double alpha_1 = 0.33;
+			auto params_0 = c_flat();
+			auto params_1 = c_twisted();
+
+			// Flat, 
+			static std::vector<double> tangent_offsets_u = {
+				-30,
+				-30,
+				30,
+				30,
+				-5,
+				-5,
+				5,
+				5,
+			};
+			// Twisted
+			static std::vector<double> tangent_offsets_v = { 0.0 };
+#endif
+
+#if E_SILK_SHOT
+			// Silk Shot
+			double alpha_0 = 0.86;
+			double alpha_1 = 0.14;
+			auto params_0 = e_dir1();
+			auto params_1 = e_dir2();
+
+			// Dir1
+			static std::vector<double> tangent_offsets_u = {
+				-25,
+				-25,
+				25,
+				25,
+			};
+			// Dir2
+			static std::vector<double> tangent_offsets_v = { 0.0 };
+#endif
+
+#if F_VELVET
+			// Silk Shot
+			double alpha_0 = 0.5;
+			double alpha_1 = 0.5;
+			auto params_0 = f_velvet();
+			auto params_1 = f_velvet();
+
+			// Dir1
+			static std::vector<double> tangent_offsets_u = {
+				-90,
+				-50,
+			};
+			// Dir2
+			static std::vector<double> tangent_offsets_v = { 
+				-90,
+				-55,
+				55,
+				90
+			};
+#endif
+
+			double cosThetaI;
+			glm::dvec3 fs = brdf_x_cosTheta(tangentu, tangentv, Ng, wi, wo, alpha_0, alpha_1, tangent_offsets_u, tangent_offsets_v, params_0, params_1, &cosThetaI);
+
+			return fs / cosThetaI;
+		}
+
+		glm::dvec3 sample(PeseudoRandom *random, const glm::dvec3 &wo) const override {
+			return UniformHemisphereSampler::sample(random, Ng);
+		}
+		double pdf(const glm::dvec3 &wo, const glm::dvec3 &sampled_wi) const override {
+			return UniformHemisphereSampler::pdf(sampled_wi, Ng);
+		}
+		//glm::dvec3 sample(PeseudoRandom *random, const glm::dvec3 &wo) const override {
+		//	return LambertianSampler::sample(random, Ng);
+		//}
+		//virtual double pdf(const glm::dvec3 &wo, const glm::dvec3 &sampled_wi) const override {
+		//	return LambertianSampler::pdf(sampled_wi, Ng);
+		//}
+	};
 
 	//class UndefinedMaterial : public IMaterial {
 	//public:
@@ -662,6 +823,7 @@ namespace rt {
 		HeitzConductorMaterial,
 #endif
 		MicrofacetVelvetMaterial,
-		MicrofacetVelvetEnergyLossMaterial
+		MicrofacetVelvetEnergyLossMaterial,
+		MicrocylinderClothMaterial
 	> Material;
 }

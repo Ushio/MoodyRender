@@ -427,6 +427,7 @@ namespace rt {
 		const char *HeitzConductorMaterialString = "HeitzConductorMaterial";
 		const char *MicrofacetVelvetMaterialString = "MicrofacetVelvetMaterial";
 		const char *MicrofacetVelvetEnergyLossMaterialString = "MicrofacetVelvetEnergyLossMaterial";
+		const char *MicrocylinderClothMaterialString = "MicrocylinderClothMaterial";
 		
 		auto rouphnessToAlpha = [](double rouphness) {
 			return rouphness * rouphness;
@@ -536,6 +537,18 @@ namespace rt {
 				double rouphness;
 				if (abcGeom.getAttribute("roughness", primID, &rouphness)) {
 					m.alpha = rouphness;
+				}
+				geom.primitives[primID].material = m;
+			}
+			else if (materialString == MicrocylinderClothMaterialString) {
+				MicrocylinderClothMaterial m;
+				glm::dvec3 tangentu;
+				glm::dvec3 tangentv;
+				if (abcGeom.getAttribute("tangentu", primID, &tangentu)) {
+					m.tangentu = tangentu;
+				}
+				if (abcGeom.getAttribute("tangentv", primID, &tangentv)) {
+					m.tangentv = tangentv;
 				}
 				geom.primitives[primID].material = m;
 			}
