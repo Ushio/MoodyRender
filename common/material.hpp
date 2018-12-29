@@ -658,10 +658,10 @@ namespace rt {
 			//return glm::dvec3(1.0 / glm::pi<double>());
 		
 #define A_LINEN_PLAIN 0
-#define B_SILK_CREPE_DE_CHINE 0
+#define B_SILK_CREPE_DE_CHINE 1
 #define C_POLYESTER_SATIN_CHARMEUSE 0
 #define D_POLYESTER_SATIN_CHARMEUSE_BACK 0
-#define E_SILK_SHOT 1
+#define E_SILK_SHOT 0
 #define F_VELVET 0
 
 #if A_LINEN_PLAIN
